@@ -11,9 +11,11 @@
 // with the target. On all Arduinos, these pins can be found
 // on the ICSP/SPI header:
 //
-//               MISO °. . 5V (!) Avoid this pin on Due, Zero...
-//               SCK   . . MOSI
-//                     . . GND
+//               MISO ¹* * 5V (!) Avoid this pin on Due, Zero...
+//               SCK   * * MOSI
+//        D10 (/RESET) * * GND
+//
+// Change: Cut ISP hesder reset connection and connect to D10
 //
 // On some Arduinos (Uno,...), pins MOSI, MISO and SCK are the same pins as
 // digital pin 11, 12 and 13, respectively. That is why many tutorials instruct
@@ -39,8 +41,9 @@
 #include "Arduino.h"
 #undef SERIAL
 
+// PROG LED flickers during programming -> set true
+const bool PROG_FLICKER = false;
 
-#define PROG_FLICKER true
 
 // Configure SPI clock (in Hz).
 // E.g. for an ATtiny @ 128 kHz: the datasheet states that both the high and low
@@ -48,9 +51,9 @@
 // f_cpu by 6:
 //     #define SPI_CLOCK            (128000/6)
 //
-// A clock slow enough for an ATtiny85 @ 1 MHz, is a reasonable default:
+// A clock slow enough for an ATtiny85 @ 8 MHz, is a reasonable default:
 
-#define SPI_CLOCK 		(1000000/6)
+#define SPI_CLOCK 		(8000000/6)
 
 
 // Select hardware or software SPI, depending on SPI clock.
@@ -139,14 +142,14 @@
 
 // Configure the baud rate:
 
-#define BAUDRATE	19200
-// #define BAUDRATE	115200
-// #define BAUDRATE	1000000
+// #define BAUDRATE	19200
+#define BAUDRATE	115200
+// #define BAUDRATE	230400
 
 
 #define HWVER 2
 #define SWMAJ 1
-#define SWMIN 18
+#define SWMIN 19
 
 // STK Definitions
 #define STK_OK      0x10
@@ -164,19 +167,23 @@ void pulse( int pin, int times );
 
 #define SPI_MODE0 0x00
 
+#if !defined(ARDUINO_API_VERSION) // A SPISettings class is declared by ArduinoCore-API
 class SPISettings {
     public:
         // clock is in Hz
-        SPISettings( uint32_t clock, uint8_t bitOrder, uint8_t dataMode ) : clock( clock ) {
+        SPISettings( uint32_t clock, uint8_t bitOrder, uint8_t dataMode ) : clockFreq( clock ) {
             ( void ) bitOrder;
             ( void ) dataMode;
         };
 
-    private:
-        uint32_t clock;
+        uint32_t getClockFreq() const {
+            return clockFreq;
+        }
 
-        friend class BitBangedSPI;
+    private:
+        uint32_t clockFreq;
 };
+#endif  // !defined(ARDUINO_API_VERSION)
 
 class BitBangedSPI {
     public:
@@ -189,14 +196,15 @@ class BitBangedSPI {
         }
 
         void beginTransaction( SPISettings settings ) {
-            pulseWidth = ( 500000 + settings.clock - 1 ) / settings.clock;
-            if ( pulseWidth == 0 )
+            pulseWidth = ( 500000 + settings.getClockFreq() - 1 ) / settings.getClockFreq();
+            if ( pulseWidth == 0 ) {
                 pulseWidth = 1;
+            }
         }
 
         void end() {}
 
-        uint8_t transfer ( uint8_t b ) {
+        uint8_t transfer( uint8_t b ) {
             for ( unsigned int i = 0; i < 8; ++i ) {
                 digitalWrite( PIN_MOSI, ( b & 0x80 ) ? HIGH : LOW );
                 digitalWrite( PIN_SCK, HIGH );
@@ -228,11 +236,17 @@ void setup() {
 
 }
 
-int error = 0;
+int ISPError = 0;
 int pmode = 0;
 // address for reading and writing, set by 'U' command
 unsigned int here;
 uint8_t buff[256]; // global block storage
+
+
+// default wait delay before writing next EEPROM location
+// can be adapted according to device signature
+const int WAIT_DELAY_EEPROM_DEFAULT = 10;
+static int wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;
 
 #define beget16(addr) (*addr * 256 + *(addr+1) )
 typedef struct param {
@@ -260,11 +274,16 @@ int8_t hbdelta = 8;
 void heartbeat() {
     static unsigned long last_time = 0;
     unsigned long now = millis();
-    if ( ( now - last_time ) < 40 )
+    if ( ( now - last_time ) < 40 ) {
         return;
+    }
     last_time = now;
-    if ( hbval > 192 ) hbdelta = -hbdelta;
-    if ( hbval < 32 ) hbdelta = -hbdelta;
+    if ( hbval > 192 ) {
+        hbdelta = -hbdelta;
+    }
+    if ( hbval < 32 ) {
+        hbdelta = -hbdelta;
+    }
     hbval += hbdelta;
     analogWrite( LED_HB, hbval );
 }
@@ -283,7 +302,7 @@ void loop( void ) {
         digitalWrite( LED_PMODE, LOW );
     }
     // is there an error?
-    if ( error ) {
+    if ( ISPError ) {
         digitalWrite( LED_ERR, HIGH );
     } else {
         digitalWrite( LED_ERR, LOW );
@@ -291,6 +310,7 @@ void loop( void ) {
 
     // light the heartbeat LED
     heartbeat();
+
     if ( SERIAL.available() ) {
         avrisp();
     }
@@ -300,6 +320,7 @@ uint8_t getch() {
     while ( !SERIAL.available() );
     return SERIAL.read();
 }
+
 void fill( int n ) {
     for ( int x = 0; x < n; x++ ) {
         buff[x] = getch();
@@ -334,7 +355,7 @@ void empty_reply() {
         SERIAL.print( ( char )STK_INSYNC );
         SERIAL.print( ( char )STK_OK );
     } else {
-        error++;
+        ISPError++;
         SERIAL.print( ( char )STK_NOSYNC );
     }
 }
@@ -345,7 +366,7 @@ void breply( uint8_t b ) {
         SERIAL.print( ( char )b );
         SERIAL.print( ( char )STK_OK );
     } else {
-        error++;
+        ISPError++;
         SERIAL.print( ( char )STK_NOSYNC );
     }
 }
@@ -398,6 +419,9 @@ void set_parameters() {
 
 void start_pmode() {
 
+    // set EEPROM delay to the default value
+    wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;
+
     // Reset target before driving PIN_SCK or PIN_MOSI
 
     // SPI.begin() will configure SS as output, so SPI master mode is selected.
@@ -438,7 +462,6 @@ void end_pmode() {
 
 void universal() {
     uint8_t ch;
-
     fill( 4 );
     ch = spi_transaction( buff[0], buff[1], buff[2], buff[3] );
     breply( ch );
@@ -450,6 +473,7 @@ void flash( uint8_t hilo, unsigned int addr, uint8_t data ) {
                      addr & 0xFF,
                      data );
 }
+
 void commit( unsigned int addr ) {
     if ( PROG_FLICKER ) {
         prog_lamp( LOW );
@@ -484,7 +508,7 @@ void write_flash( int length ) {
         SERIAL.print( ( char ) STK_INSYNC );
         SERIAL.print( ( char ) write_flash_pages( length ) );
     } else {
-        error++;
+        ISPError++;
         SERIAL.print( ( char ) STK_NOSYNC );
     }
 }
@@ -513,7 +537,7 @@ uint8_t write_eeprom( unsigned int length ) {
     unsigned int start = here * 2;
     unsigned int remaining = length;
     if ( length > param.eepromsize ) {
-        error++;
+        ISPError++;
         return STK_FAILED;
     }
     while ( remaining > EECHUNK ) {
@@ -524,6 +548,7 @@ uint8_t write_eeprom( unsigned int length ) {
     write_eeprom_chunk( start, remaining );
     return STK_OK;
 }
+
 // write (length) bytes, (start) is a byte address
 uint8_t write_eeprom_chunk( unsigned int start, unsigned int length ) {
     // this writes byte-by-byte, page writing may be faster (4 bytes at a time)
@@ -532,7 +557,7 @@ uint8_t write_eeprom_chunk( unsigned int start, unsigned int length ) {
     for ( unsigned int x = 0; x < length; x++ ) {
         unsigned int addr = start + x;
         spi_transaction( 0xC0, ( addr >> 8 ) & 0xFF, addr & 0xFF, buff[x] );
-        delay( 45 );
+        delay( wait_delay_EEPROM );
     }
     prog_lamp( HIGH );
     return STK_OK;
@@ -554,7 +579,7 @@ void program_page() {
             SERIAL.print( ( char ) STK_INSYNC );
             SERIAL.print( result );
         } else {
-            error++;
+            ISPError++;
             SERIAL.print( ( char ) STK_NOSYNC );
         }
         return;
@@ -598,19 +623,23 @@ void read_page() {
     length += getch();
     char memtype = getch();
     if ( CRC_EOP != getch() ) {
-        error++;
+        ISPError++;
         SERIAL.print( ( char ) STK_NOSYNC );
         return;
     }
     SERIAL.print( ( char ) STK_INSYNC );
-    if ( memtype == 'F' ) result = flash_read_page( length );
-    if ( memtype == 'E' ) result = eeprom_read_page( length );
+    if ( memtype == 'F' ) {
+        result = flash_read_page( length );
+    }
+    if ( memtype == 'E' ) {
+        result = eeprom_read_page( length );
+    }
     SERIAL.print( result );
 }
 
-void read_signature() {
+void read_signature() { // used with arduino protocol, stk500v1 uses three universal() calls
     if ( CRC_EOP != getch() ) {
-        error++;
+        ISPError++;
         SERIAL.print( ( char ) STK_NOSYNC );
         return;
     }
@@ -622,6 +651,27 @@ void read_signature() {
     uint8_t low = spi_transaction( 0x30, 0x00, 0x02, 0x00 );
     SERIAL.print( ( char ) low );
     SERIAL.print( ( char ) STK_OK );
+    // HACK: set short delay for newer devices
+    wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT; // set default value
+    // HACK: set short delay for newer devices
+    if ( 0x1e == high ) { // valid AVR part
+        if ( 0x95 == middle ) { // 32K flash part
+            if ( 0x0f == low || 0x14 == low ) // m328p, m328
+                wait_delay_EEPROM = 4;
+        } else if ( 0x94 == middle ) { // 16K flash part
+            if ( 0x06 == low || 0x0b == low ) // m168, m168p
+                wait_delay_EEPROM = 4;
+        } else if ( 0x93 == middle ) { // 8K flash part
+            if ( 0x0a == low || 0x0b == low || 0x0f == low ) // m88, t85, m88p
+                wait_delay_EEPROM = 4;
+        } else if ( 0x92 == middle ) { // 4K flash part
+            if ( 0x05 == low || 0x06 == low || 0x0a ) // m48, t45, m48p
+                wait_delay_EEPROM = 4;
+        } else if ( 0x91 == middle ) { // 2K flash part
+            if ( 0x08 == low ) // t25
+                wait_delay_EEPROM = 4;
+        }
+    }
 }
 //////////////////////////////////////////
 //////////////////////////////////////////
@@ -633,7 +683,7 @@ void avrisp() {
     uint8_t ch = getch();
     switch ( ch ) {
         case '0': // signon
-            error = 0;
+            ISPError = 0;
             empty_reply();
             break;
         case '1':
@@ -642,7 +692,7 @@ void avrisp() {
                 SERIAL.print( "AVR ISP" );
                 SERIAL.print( ( char ) STK_OK );
             } else {
-                error++;
+                ISPError++;
                 SERIAL.print( ( char ) STK_NOSYNC );
             }
             break;
@@ -659,8 +709,9 @@ void avrisp() {
             empty_reply();
             break;
         case 'P':
-            if ( !pmode )
+            if ( !pmode ) {
                 start_pmode();
+            }
             empty_reply();
             break;
         case 'U': // set address (word)
@@ -674,6 +725,7 @@ void avrisp() {
             getch(); // high addr
             empty_reply();
             break;
+
         case 0x61: //STK_PROG_DATA
             getch(); // data
             empty_reply();
@@ -690,8 +742,9 @@ void avrisp() {
         case 'V': //0x56
             universal();
             break;
+
         case 'Q': //0x51
-            error = 0;
+            ISPError = 0;
             end_pmode();
             empty_reply();
             break;
@@ -703,16 +756,17 @@ void avrisp() {
         // expecting a command, not CRC_EOP
         // this is how we can get back in sync
         case CRC_EOP:
-            error++;
+            ISPError++;
             SERIAL.print( ( char ) STK_NOSYNC );
             break;
 
         // anything else we will return STK_UNKNOWN
         default:
-            error++;
-            if ( CRC_EOP == getch() )
+            ISPError++;
+            if ( CRC_EOP == getch() ) {
                 SERIAL.print( ( char )STK_UNKNOWN );
-            else
+            } else {
                 SERIAL.print( ( char )STK_NOSYNC );
+            }
     }
 }
