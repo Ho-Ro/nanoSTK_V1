@@ -1,0 +1,17 @@
+# file ~/.avrduderc
+
+# arduino nano with ArduinoISP
+# type "arduino" protocol supports "read_signature()"
+# the programmer adapts the EEPROM timing accordingly for newer devices
+
+programmer
+  id = "nanoISP";
+  desc = "ArduinoISP";
+  type = "arduino";
+  connection_type = serial;
+  baudrate = 115200;
+;
+
+default_programmer  = "nanoISP";
+
+default_serial = "/dev/ttyUSB0";
