@@ -71,8 +71,9 @@ static uint32_t spi_clock = SPI_CLOCK_SLOW;
 static uint8_t sck_duration = SCK_DURATION_SLOW;
 
 
-// target voltage * 10
-#define VTARGET_MUL10       50
+// target and adjust voltage * 10
+static uint8_t V_target_10 = 50;
+static uint8_t V_adjust_10 = 0;
 
 
 // Configure which pins to use:
@@ -264,13 +265,19 @@ void get_parameter( uint8_t c ) {
             byte_reply( SWMIN );
             break;
         case Parm_STK_VTARGET:      // 0x84
-            byte_reply( VTARGET_MUL10 );
+            byte_reply( V_target_10 );
+            break;
+        case Parm_STK_VADJUST:      // 0x85
+            byte_reply( V_adjust_10 );
             break;
         case Parm_STK_SCK_DURATION: // 0x89
             byte_reply( sck_duration );
             break;
-        case 0x93:
-            byte_reply( 'S' ); // serial programmer
+        case Parm_STK_PROGMODE:
+            byte_reply( 'S' );      // serial programmer
+            break;
+        case Param_STK500_TOPCARD_DETECT:
+            byte_reply( 0x03 );     // no top card
             break;
         default:
             byte_reply( 0 );
