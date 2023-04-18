@@ -15,7 +15,7 @@
 //               SCK   * * MOSI
 //        D10 (/RESET) * * GND
 //
-// Change: Cut ISP hesder reset connection and connect to D10
+// HW Change: Cut ISP header reset connection and connect to D10
 //
 // On some Arduinos (Uno,...), pins MOSI, MISO and SCK are the same pins as
 // digital pin 11, 12 and 13, respectively. That is why many tutorials instruct
@@ -69,11 +69,6 @@
 // start with slow SPI as default, will be set later in setup()
 static uint32_t spi_clock = SPI_CLOCK_SLOW;
 static uint8_t sck_duration = SCK_DURATION_SLOW;
-
-
-// target and adjust voltage * 10
-static uint8_t V_target_10 = 50;
-static uint8_t V_adjust_10 = 0;
 
 
 // Configure which pins to use:
@@ -195,6 +190,15 @@ void loop( void ) {
 }
 
 
+// measure the 3V3 voltage and calculate Vcc, return 10 * Vcc
+uint8_t get_V_target_10() {
+    // Vref is Vcc; analogRead( Vcc ) -> 1023
+    // Vcc = 3.3V * round( 1023 / v33 )
+    uint16_t v33 = analogRead( A0 ); // about 700
+    return ( 33 * 1023L + v33 / 2 ) / v33;
+}
+
+
 uint8_t getch() {
     while ( !Serial.available() )
         ;
@@ -265,10 +269,10 @@ void get_parameter( uint8_t c ) {
             byte_reply( SWMIN );
             break;
         case Parm_STK_VTARGET:      // 0x84
-            byte_reply( V_target_10 );
+            byte_reply( get_V_target_10() );
             break;
         case Parm_STK_VADJUST:      // 0x85
-            byte_reply( V_adjust_10 );
+            byte_reply( 0 );
             break;
         case Parm_STK_SCK_DURATION: // 0x89
             byte_reply( sck_duration );
