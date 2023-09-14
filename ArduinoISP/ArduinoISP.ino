@@ -1,3 +1,7 @@
+// nanoSTK
+// using arduino nano as ISP with STK500 v1 protocol
+// program based on:
+//
 // ArduinoISP
 // Copyright (c) 2008-2011 Randall Bohn
 // If you require a license, see
@@ -33,8 +37,9 @@
 // and target) at 3V3.
 //
 // Put an LED (with resistor) on the following pins:
-// 7: Error       - Lights up if something goes wrong (use red if that makes sense)
-// 8: Programming - In communication with the slave
+// 9: Heartbeat   - shows the programmer is running
+// 8: Error       - Lights up if something goes wrong (use red if that makes sense)
+// 7: Programming - In communication with the slave
 //
 
 #include "Arduino.h"
@@ -44,6 +49,9 @@
 // AVR061 - STK500 Communication Protocol
 #include "command.h"
 
+// uncomment to use the modified arduino bootloader protocol (word address also for EEPROM)
+// otherwise use original STK500 v1 protocol (EEPROM byte address)
+// #define ARDUINO_PROTOCOL
 
 // Configure SPI clock (in Hz).
 // E.g. for an ATtiny @ 128 kHz: the datasheet states that both the high and low
@@ -77,10 +85,14 @@ static uint8_t sck_duration = SCK_DURATION_SLOW;
 
 // Use pin 10 to reset the target rather than SS
 #define RESET     10
-// Programming activity LED
-#define LED_PMODE 8
+
+// Heartbeat LED
+#define LED_HB    9
 // Error LED
-#define LED_ERR   7
+#define LED_ERR   8
+// Programming activity LED
+#define LED_PMODE 7
+
 // switch: open = FAST, closed = SLOW
 #define SWITCH_FAST   2
 
@@ -108,7 +120,7 @@ static uint8_t sck_duration = SCK_DURATION_SLOW;
 
 #define HWVER 2
 #define SWMAJ 1
-#define SWMIN 19
+#define SWMIN 20
 
 
 void pulse( int pin, int times );
@@ -121,6 +133,8 @@ void setup() {
     pulse( LED_PMODE, 2 );
     pinMode( LED_ERR, OUTPUT );
     pulse( LED_ERR, 2 );
+    pinMode(LED_HB, OUTPUT);
+    pulse(LED_HB, 2);
 
     pinMode( SWITCH_FAST, INPUT_PULLUP );
 }
@@ -129,8 +143,8 @@ void setup() {
 static int ISPError = 0;
 static bool pmode = false;
 // address for reading and writing, set by 'U' command
-unsigned int here;
-uint8_t buff[ 256 ]; // global block storage
+static unsigned int here;
+static uint8_t buff[ 256 ]; // global block storage
 
 
 // default wait delay before writing next EEPROM location
@@ -162,6 +176,26 @@ param_t;
 param_t param;
 
 
+// this provides a heartbeat on pin 9, so you can tell the software is running.
+uint8_t hbval = 128;
+int8_t hbdelta = 8;
+void heartbeat() {
+  static unsigned long last_time = 0;
+  unsigned long now = millis();
+  if ((now - last_time) < 40) {
+    return;
+  }
+  last_time = now;
+  if (hbval > 192) {
+    hbdelta = -hbdelta;
+  }
+  if (hbval < 32) {
+    hbdelta = -hbdelta;
+  }
+  hbval += hbdelta;
+  analogWrite(LED_HB, hbval);
+}
+
 static bool rst_active_high;
 
 
@@ -184,6 +218,8 @@ void loop( void ) {
         digitalWrite( LED_ERR, LOW );
     }
 
+    // light the heartbeat LED
+      heartbeat();
     if ( Serial.available() ) {
         avrisp(); // process STK command
     }
@@ -440,8 +476,12 @@ uint8_t write_flash_pages( int length ) {
 
 #define EECHUNK (32)
 uint8_t write_eeprom( unsigned int length ) {
-    // here is a word address, get the byte address
-    unsigned int start = here * 2;
+    unsigned int start = here; // address of EEPROM
+#ifdef ARDUINO_PROTOCOL
+    // arduino bootloader protocol sends word addresses also for EEPROM
+    // calculate the EEPROM byte address
+    start *= 2;
+#endif
     unsigned int remaining = length;
     if ( length > param.eepromsize ) {
         ISPError++;
@@ -515,8 +555,12 @@ char flash_read_page( int length ) {
 
 
 char eeprom_read_page( int length ) {
-    // here again we have a word address
-    int start = here * 2;
+    int start = here; // address of EEPROM
+#ifdef ARDUINO_PROTOCOL
+    // arduino bootloader protocol sends word addresses also for EEPROM
+    // calculate the EEPROM byte address
+    start *= 2;
+#endif
     for ( int x = 0; x < length; x++ ) {
         int addr = start + x;
         // read_eeprom_memory

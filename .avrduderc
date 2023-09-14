@@ -4,14 +4,14 @@
 # type "arduino" protocol supports "read_signature()"
 # the programmer adapts the EEPROM timing accordingly for newer devices
 
+default_programmer  = "nanoSTK";
+
+default_serial = "/dev/ttyUSB0";
+
 programmer
-  id = "nanoISP";
-  desc = "ArduinoISP";
-  type = "arduino";
+  id    = "nanoSTK";
+  desc  = "Arduino nano as ISP (STK500 v1 protocol)";
+  type  = "stk500";
   connection_type = serial;
   baudrate = 115200;
 ;
-
-default_programmer  = "nanoISP";
-
-default_serial = "/dev/ttyUSB0";
