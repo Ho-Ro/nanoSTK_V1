@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
 // nanoSTK
 // using arduino nano as ISP with STK500 v1 protocol
 // program based on:
