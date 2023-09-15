@@ -7,40 +7,48 @@
 // If you require a license, see
 // http://www.opensource.org/licenses/bsd-license.php
 //
-// This sketch turns the Arduino into a AVRISP using the following Arduino pins:
-//
-// Pin 10 is used to reset the target microcontroller.
+// This software turns the Arduino Nano into an AVR ISP using the following Arduino pins:
 //
 // By default, the hardware SPI pins MISO, MOSI and SCK are used to communicate
-// with the target. On all Arduinos, these pins can be found
-// on the ICSP/SPI header:
+// with the target. On all Arduinos, these pins can be found on the ICSP/SPI header:
 //
 //               MISO ¹* * 5V (!) Avoid this pin on Due, Zero...
 //               SCK   * * MOSI
 //        D10 (/RESET) * * GND
 //
-// HW Change: Cut ISP header reset connection and connect to D10
+// Pin 10 is used to reset the target microcontroller.
 //
-// On some Arduinos (Uno,...), pins MOSI, MISO and SCK are the same pins as
-// digital pin 11, 12 and 13, respectively. That is why many tutorials instruct
-// you to hook up the target to these pins. If you find this wiring more
-// practical, have a define USE_OLD_STYLE_WIRING. This will work even when not
-// using an Uno. (On an Uno this is not needed).
+// Required HW change:
+// Cut ISP header /RESET connection and connect this pin to D10
 //
-// Alternatively you can use any other digital pin by configuring
-// software ('BitBanged') SPI and having appropriate defines for PIN_MOSI,
-// PIN_MISO and PIN_SCK.
-//
-// IMPORTANT: When using an Arduino that is not 5V tolerant (Due, Zero, ...) as
-// the programmer, make sure to not expose any of the programmer's pins to 5V.
-// A simple way to accomplish this is to power the complete system (programmer
-// and target) at 3V3.
-//
+// Optional HW changes:
 // Put an LED (with resistor) on the following pins:
-// 9: Heartbeat   - shows the programmer is running
+// 9: Heartbeat   - Indicates that the programmer is running
 // 8: Error       - Lights up if something goes wrong (use red if that makes sense)
 // 7: Programming - In communication with the slave
 //
+
+
+// HW version 2
+#define HWVER 2
+
+// SW version 1.20
+#define SWMAJ 1
+#define SWMIN 20
+
+
+// This program uses the original "stk500v1" protocol with byte addresses for EEPROM access.
+// The modified "arduino" bootloader protocol addresses also the EEPROM word-wise.
+// To enable the automatic detection of the "arduino" protocol uncomment the next line.
+#define DETECT_ARDUINO_PROTOCOL
+
+
+// Configure the baud rate:
+
+// #define BAUDRATE  19200
+#define BAUDRATE 115200
+// #define BAUDRATE 230400
+
 
 #include "Arduino.h"
 
@@ -48,10 +56,6 @@
 
 // AVR061 - STK500 Communication Protocol
 #include "command.h"
-
-// uncomment to use the modified arduino bootloader protocol (word address also for EEPROM)
-// otherwise use original STK500 v1 protocol (EEPROM byte address)
-// #define ARDUINO_PROTOCOL
 
 // Configure SPI clock (in Hz).
 // E.g. for an ATtiny @ 128 kHz: the datasheet states that both the high and low
@@ -111,18 +115,6 @@ static uint8_t sck_duration = SCK_DURATION_SLOW;
 #endif
 
 
-// Configure the baud rate:
-
-// #define BAUDRATE	19200
-#define BAUDRATE	115200
-// #define BAUDRATE	230400
-
-
-#define HWVER 2
-#define SWMAJ 1
-#define SWMIN 20
-
-
 void pulse( int pin, int times );
 
 
@@ -140,8 +132,9 @@ void setup() {
 }
 
 
-static int ISPError = 0;
+static bool ISPError = false;
 static bool pmode = false;
+static bool use_arduino_protocol = false; // use stk500v1 as default
 // address for reading and writing, set by 'U' command
 static unsigned int here;
 static uint8_t buff[ 256 ]; // global block storage
@@ -275,7 +268,7 @@ void empty_reply() {
         Serial.write( Resp_STK_INSYNC );
         Serial.write( Resp_STK_OK );
     } else {
-        ISPError++;
+        ISPError = true;
         Serial.write( Resp_STK_NOSYNC );
     }
 }
@@ -287,7 +280,7 @@ void byte_reply( uint8_t b ) {
         Serial.write( b );
         Serial.write( Resp_STK_OK );
     } else {
-        ISPError++;
+        ISPError = true;
         Serial.write( Resp_STK_NOSYNC );
     }
 }
@@ -367,6 +360,9 @@ void start_pmode() {
         sck_duration = SCK_DURATION_SLOW;
     }
 
+    // set default stk500v1 protocol
+    use_arduino_protocol = false;
+
     // Reset target before driving PIN_SCK or PIN_MOSI
 
     // SPI.begin() will configure SS as output, so SPI master mode is selected.
@@ -404,6 +400,7 @@ void end_pmode() {
     reset_target( false );
     pinMode( RESET, INPUT );
     pmode = false;
+    use_arduino_protocol = false; // switch back to default stk500v1 protocol
 }
 
 
@@ -449,7 +446,7 @@ void write_flash( int length ) {
         Serial.write( Resp_STK_INSYNC );
         Serial.write( write_flash_pages( length ) );
     } else {
-        ISPError++;
+        ISPError = true;
         Serial.write( Resp_STK_NOSYNC );
     }
 }
@@ -477,14 +474,14 @@ uint8_t write_flash_pages( int length ) {
 #define EECHUNK (32)
 uint8_t write_eeprom( unsigned int length ) {
     unsigned int start = here; // address of EEPROM
-#ifdef ARDUINO_PROTOCOL
-    // arduino bootloader protocol sends word addresses also for EEPROM
-    // calculate the EEPROM byte address
-    start *= 2;
-#endif
+    if ( use_arduino_protocol ) {
+        // arduino bootloader protocol sends word addresses also for EEPROM
+        // calculate the EEPROM byte address
+        start *= 2;
+    }
     unsigned int remaining = length;
     if ( length > param.eepromsize ) {
-        ISPError++;
+        ISPError = true;
         return Resp_STK_FAILED;
     }
     while ( remaining > EECHUNK ) {
@@ -526,7 +523,7 @@ void program_page() {
             Serial.write( Resp_STK_INSYNC );
             Serial.print( result );
         } else {
-            ISPError++;
+            ISPError = true;
             Serial.write( Resp_STK_NOSYNC );
         }
         return;
@@ -556,11 +553,11 @@ char flash_read_page( int length ) {
 
 char eeprom_read_page( int length ) {
     int start = here; // address of EEPROM
-#ifdef ARDUINO_PROTOCOL
-    // arduino bootloader protocol sends word addresses also for EEPROM
-    // calculate the EEPROM byte address
-    start *= 2;
-#endif
+    if ( use_arduino_protocol ) {
+        // arduino bootloader protocol sends word addresses also for EEPROM
+        // calculate the EEPROM byte address
+        start *= 2;
+    }
     for ( int x = 0; x < length; x++ ) {
         int addr = start + x;
         // read_eeprom_memory
@@ -576,7 +573,7 @@ void read_page() {
     length += getch();
     char memtype = getch();
     if ( Sync_CRC_EOP != getch() ) {
-        ISPError++;
+        ISPError = true;
         Serial.write( Resp_STK_NOSYNC );
         return;
     }
@@ -593,10 +590,15 @@ void read_page() {
 
 void read_signature() { // used with arduino protocol, stk500v1 uses three universal() calls instead
     if ( Sync_CRC_EOP != getch() ) {
-        ISPError++;
+        ISPError = true;
         Serial.write( Resp_STK_NOSYNC );
         return;
     }
+
+#ifdef DETECT_ARDUINO_PROTOCOL
+    use_arduino_protocol = true;
+#endif
+
     Serial.write( Resp_STK_INSYNC );
     uint8_t high = spi_transaction( 0x30, 0x00, 0x00, 0x00 );   // read signature byte 0
     Serial.write( high );
@@ -635,7 +637,7 @@ void avrisp() {
     uint8_t ch = getch();
     switch ( ch ) {
         case Cmnd_STK_GET_SYNC:                     // 0x30 '0' signon
-            ISPError = 0;
+            ISPError = false;
             empty_reply();
             break;
         case Cmnd_STK_GET_SIGN_ON:                  // 0x31 '1'
@@ -644,7 +646,7 @@ void avrisp() {
                 Serial.print( "AVR ISP" );
                 Serial.write( Resp_STK_OK );
             } else {
-                ISPError++;
+                ISPError = true;
                 Serial.write( Resp_STK_NOSYNC );    // 0x15
             }
             break;
@@ -670,7 +672,7 @@ void avrisp() {
             break;
 
         case Cmnd_STK_LEAVE_PROGMODE:               // 0x51 'Q'
-            ISPError = 0;
+            ISPError = false;
             end_pmode();
             empty_reply();
             break;
@@ -711,13 +713,13 @@ void avrisp() {
         // expecting a command, not Sync_CRC_EOP
         // this is how we can get back in sync
         case Sync_CRC_EOP:                          // 0x20 ' '
-            ISPError++;
+            ISPError = true;
             Serial.write( Resp_STK_NOSYNC );
             break;
 
         // anything else we will return STK_UNKNOWN
         default:
-            ISPError++;
+            ISPError = true;
             if ( Sync_CRC_EOP == getch() ) {
                 Serial.write( Resp_STK_UNKNOWN );   // 0x12
             } else {

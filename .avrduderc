@@ -1,8 +1,6 @@
 # file ~/.avrduderc
 
-# arduino nano with ArduinoISP
-# type "arduino" protocol supports "read_signature()"
-# the programmer adapts the EEPROM timing accordingly for newer devices
+# Arduino Nano with firmware "nanoSTK" using original stk500v1 protocol
 
 default_programmer  = "nanoSTK";
 
@@ -10,7 +8,7 @@ default_serial = "/dev/ttyUSB0";
 
 programmer
   id    = "nanoSTK";
-  desc  = "Arduino nano as ISP (STK500 v1 protocol)";
+  desc  = "Arduino Nano as AVR ISP (STK500 v1 protocol)";
   type  = "stk500";
   connection_type = serial;
   baudrate = 115200;
