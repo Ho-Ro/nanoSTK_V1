@@ -139,8 +139,9 @@ static bool pmode = false;
 static bool use_arduino_protocol = false; // use stk500v1 as default
 // address for reading and writing, set by 'U' command
 static unsigned int here;
-static uint8_t buff[ 256 ]; // global block storage
-
+static uint8_t buff[256]; // global block storage
+// signature bytes
+static uint8_t sig[3];
 
 // default wait delay before writing next EEPROM location
 // can be adapted according to device signature
@@ -365,6 +366,9 @@ void start_pmode() {
     // set default stk500v1 protocol
     use_arduino_protocol = false;
 
+    for ( uint8_t iii = 0; iii < 3; ++iii )
+        sig[iii] = 0; // clear signature bytes
+
     // Reset target before driving PIN_SCK or PIN_MOSI
 
     // SPI.begin() will configure SS as output, so SPI master mode is selected.
@@ -403,12 +407,19 @@ void end_pmode() {
     pinMode( RESET, INPUT );
     pmode = false;
     use_arduino_protocol = false; // switch back to default stk500v1 protocol
+    for ( uint8_t iii = 0; iii < 3; ++iii )
+        sig[iii] = 0; // clear signature bytes
 }
 
 
 void universal() {
     fill( 4 );
-    byte_reply( spi_transaction( buff[0], buff[1], buff[2], buff[3] ) );
+    uint8_t reply = spi_transaction( buff[0], buff[1], buff[2], buff[3] );
+    byte_reply( reply );
+    if ( 0x30 == buff[0] && buff[2] < 3 ) // read one signature byte
+        sig[buff[2]] = reply;
+    if ( sig[0] && sig[1] && sig[2] ) // all sig bytes available
+        hack_eeprom_delay(); // shorter delay for newer parts
 }
 
 
@@ -602,31 +613,33 @@ void read_signature() { // used with arduino protocol, stk500v1 uses three unive
 #endif
 
     Serial.write( Resp_STK_INSYNC );
-    uint8_t high = spi_transaction( 0x30, 0x00, 0x00, 0x00 );   // read signature byte 0
-    Serial.write( high );
-    uint8_t middle = spi_transaction( 0x30, 0x00, 0x01, 0x00 ); // read signature byte 1
-    Serial.write( middle );
-    uint8_t low = spi_transaction( 0x30, 0x00, 0x02, 0x00 );    // read signature byte 2
-    Serial.write( low );
+    for ( uint8_t iii = 0; iii < 3; ++iii ) {
+        sig[iii] = spi_transaction( 0x30, 0x00, iii, 0x00 );   // read signature bytes
+        Serial.write( sig[iii] );
+    }
     Serial.write( Resp_STK_OK );
+    hack_eeprom_delay();
+}
 
+
+void hack_eeprom_delay() {
     // HACK: set short eeprom delay 4 ms for newer devices instead of 10 ms
     wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;              // set default value
-    if ( 0x1e == high ) {                                       // valid AVR parts
-        if ( 0x95 == middle ) {                                 // 32K flash parts
-            if ( 0x0f == low || 0x14 == low )                   // m328p, m328
+    if ( 0x1e == sig[0] ) {                                     // valid AVR parts
+        if ( 0x95 == sig[1] ) {                                 // 32K flash parts
+            if ( 0x0f == sig[2] || 0x14 == sig[2] )             // m328p, m328
                 wait_delay_EEPROM = 4;
-        } else if ( 0x94 == middle ) {                          // 16K flash parts
-            if ( 0x06 == low || 0x0b == low )                   // m168, m168p
+        } else if ( 0x94 == sig[1] ) {                          // 16K flash parts
+            if ( 0x06 == sig[2] || 0x0b == sig[2] )             // m168, m168p
                 wait_delay_EEPROM = 4;
-        } else if ( 0x93 == middle ) {                          // 8K flash parts
-            if ( 0x0a == low || 0x0b == low || 0x0f == low )    // m88, t85, m88p
+        } else if ( 0x93 == sig[1] ) {                          // 8K flash parts
+            if ( 0x0a == sig[2] || 0x0b == sig[2] || 0x0f == sig[2] ) // m88, t85, m88p
                 wait_delay_EEPROM = 4;
-        } else if ( 0x92 == middle ) {                          // 4K flash parts
-            if ( 0x05 == low || 0x06 == low || 0x0a == low )    // m48, t45, m48p
+        } else if ( 0x92 == sig[1] ) {                          // 4K flash parts
+            if ( 0x05 == sig[2] || 0x06 == sig[2] || 0x0a == sig[2] ) // m48, t45, m48p
                 wait_delay_EEPROM = 4;
-        } else if ( 0x91 == middle ) {                          // 2K flash parts
-            if ( 0x08 == low )                                  // t25
+        } else if ( 0x91 == sig[1] ) {                          // 2K flash parts
+            if ( 0x08 == sig[2] )                               // t25
                 wait_delay_EEPROM = 4;
         }
     }
