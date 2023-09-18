@@ -366,8 +366,9 @@ void start_pmode() {
     // set default stk500v1 protocol
     use_arduino_protocol = false;
 
+    // clear signature bytes
     for ( uint8_t iii = 0; iii < 3; ++iii )
-        sig[iii] = 0; // clear signature bytes
+        sig[iii] = 0;
 
     // Reset target before driving PIN_SCK or PIN_MOSI
 
@@ -416,6 +417,7 @@ void universal() {
     fill( 4 );
     uint8_t reply = spi_transaction( buff[0], buff[1], buff[2], buff[3] );
     byte_reply( reply );
+    // check if read sig byte #n: 0x30, 0, n, 0
     if ( 0x30 == buff[0] && buff[2] < 3 ) // read one signature byte
         sig[buff[2]] = reply;
     if ( sig[0] && sig[1] && sig[2] ) // all sig bytes available
@@ -624,23 +626,24 @@ void read_signature() { // used with arduino protocol, stk500v1 uses three unive
 
 void hack_eeprom_delay() {
     // HACK: set short eeprom delay 4 ms for newer devices instead of 10 ms
+    const int WAIT_DELAY_EEPROM_FAST = 4;
     wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;              // set default value
     if ( 0x1e == sig[0] ) {                                     // valid AVR parts
         if ( 0x95 == sig[1] ) {                                 // 32K flash parts
             if ( 0x0f == sig[2] || 0x14 == sig[2] )             // m328p, m328
-                wait_delay_EEPROM = 4;
+                wait_delay_EEPROM = WAIT_DELAY_EEPROM_FAST;
         } else if ( 0x94 == sig[1] ) {                          // 16K flash parts
             if ( 0x06 == sig[2] || 0x0b == sig[2] )             // m168, m168p
-                wait_delay_EEPROM = 4;
+                wait_delay_EEPROM = WAIT_DELAY_EEPROM_FAST;
         } else if ( 0x93 == sig[1] ) {                          // 8K flash parts
             if ( 0x0a == sig[2] || 0x0b == sig[2] || 0x0f == sig[2] ) // m88, t85, m88p
-                wait_delay_EEPROM = 4;
+                wait_delay_EEPROM = WAIT_DELAY_EEPROM_FAST;
         } else if ( 0x92 == sig[1] ) {                          // 4K flash parts
             if ( 0x05 == sig[2] || 0x06 == sig[2] || 0x0a == sig[2] ) // m48, t45, m48p
-                wait_delay_EEPROM = 4;
+                wait_delay_EEPROM = WAIT_DELAY_EEPROM_FAST;
         } else if ( 0x91 == sig[1] ) {                          // 2K flash parts
             if ( 0x08 == sig[2] )                               // t25
-                wait_delay_EEPROM = 4;
+                wait_delay_EEPROM = WAIT_DELAY_EEPROM_FAST;
         }
     }
 }
