@@ -1,15 +1,6 @@
 # file ~/.avrduderc
 
-# Arduino Nano with firmware "nanoSTK" using original stk500v1 protocol
-
-default_programmer  = "nanoSTK";
+default_programmer  = "stk500v1";
 
 default_serial = "/dev/ttyUSB0";
 
-programmer
-  id    = "nanoSTK";
-  desc  = "Arduino Nano as AVR ISP (STK500 v1 protocol)";
-  type  = "stk500";
-  connection_type = serial;
-  baudrate = 115200;
-;

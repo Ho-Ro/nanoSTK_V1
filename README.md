@@ -1,4 +1,4 @@
-# nanoSTK
+# nanoSTK_V1
 
 ## Using Arduino Nano as AVR ISP with STK500 v1 protocol
 
@@ -32,11 +32,13 @@ On all Arduinos, these pins are found on the ICSP/SPI header:
 
 #### Optional Modifications
 
-Put an LED (with resistor to GND) on the following pins:
+Put an LED (with resistor) on the following pins:
 
-- 9: Heartbeat   - Indicates that the programmer is running
-- 8: Error       - Lights up if something goes wrong (use red if that makes sense)
-- 7: Programming - In communication with the slave
+- D9: Heartbeat - Indicates that the programmer is running
+- D8: Error     - An Error has occured - clear with programmer reset
+- D7: Write     - Writing to the target
+- D6: Read      - Reading from the targer
+- D5: PMode     - Target in programming mode
 
 With this setup the modified nanoSTK provides the supply voltage of 5 V to the target.
 
@@ -49,20 +51,9 @@ Put this file into your home directory to set the nanoSTK device as the default 
 ```
 # file ~/.avrduderc
 
-# Arduino Nano with firmware "nanoSTK" using original stk500v1 protocol
-
-default_programmer  = "nanoSTK";
+default_programmer  = "stk500v1";
 
 default_serial = "/dev/ttyUSB0";
-
-programmer
-  id    = "nanoSTK";
-  desc  = "Arduino Nano as AVR ISP (STK500 v1 protocol)";
-  type  = "stk500";
-  connection_type = serial;
-  baudrate = 115200;
-;
-
 ```
 
 ### Use with AVRDUDE
@@ -88,7 +79,7 @@ avrdude: Version 7.1
          User configuration file is ~/.avrduderc
 
          Using Port                    : /dev/ttyUSB0
-         Using Programmer              : nanoSTK
+         Using Programmer              : stk500v1
          AVR Part                      : ATtiny85
          Chip Erase delay              : 4500 us
          RESET disposition             : possible i/o
@@ -116,9 +107,9 @@ avrdude: Version 7.1
            calibration             0     0     0    0 no          1    1      0     0     0 0x00 0x00
 
          Programmer Type : STK500
-         Description     : Arduino Nano as AVR ISP (STK500 v1 protocol)
+         Description     : Atmel STK500 version 1.x firmware
          Hardware Version: 2
-         Firmware Version: 1.20
+         Firmware Version: 1.21
          Vtarget         : 4.8 V
          Varef           : 0.0 V
          Oscillator      : Off
@@ -128,6 +119,7 @@ avrdude: AVR device initialized and ready to accept instructions
 avrdude: device signature = 0x1e930b (probably t85)
 
 avrdude done.  Thank you.
+
 ```
 
 ## Programming Protocol
