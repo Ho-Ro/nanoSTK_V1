@@ -31,3 +31,5 @@ with most significant bit (MSB) first.
 
 #define ISP_READ_EEPROM         0xA0
 #define ISP_WRITE_EEPROM        0xC0
+#define ISP_LOAD_EEPROM_PAGE    0xC1
+#define ISP_WRITE_EEPROM_PAGE   0xC2
