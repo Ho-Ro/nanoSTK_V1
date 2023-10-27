@@ -15,8 +15,11 @@ with most significant bit (MSB) first.
 
 */
 
+// check 3 signature bytes
+#define SIG_SIZE                3
 
-#define ISP_ENTER_PMODE_4BYTE   0xAC, 0x53, 0x00, 0x00
+#define ISP_ENTER_PMODE_BYTE_0   0xAC
+#define ISP_ENTER_PMODE_BYTE_1   0x53
 
 #define ISP_READ_PROG           0x20
 // "0010.0000--00aa.aaaa--aaaa.aaaa--oooo.oooo"; (all examples are for m328)

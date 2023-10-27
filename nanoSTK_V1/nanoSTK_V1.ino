@@ -25,15 +25,15 @@
 // Required HW change:
 // Cut ISP header /RESET connection and connect this pin to D10
 
-#define RESET     10
+#define RESET       10
 
 
 // HW version 2
-#define HWVER 2
+#define HWVER       2
 
 // SW version 1.23
-#define SWMAJ 1
-#define SWMIN 23
+#define SWMAJ       1
+#define SWMIN       23
 
 
 // This program uses the original "stk500v1" protocol with byte addresses for EEPROM access.
@@ -45,7 +45,7 @@
 // Configure the baud rate:
 
 // #define BAUDRATE  19200
-#define BAUDRATE 115200
+#define BAUDRATE    115200
 // BAUDRATE > 115200 does not work!
 // #define BAUDRATE 230400
 
@@ -119,15 +119,15 @@ static uint8_t sck_duration = SCK_DURATION_SLOW;
 
 // By default, use hardware SPI pins:
 #ifndef PIN_MOSI
-#define PIN_MOSI 	MOSI
+#define PIN_MOSI    MOSI
 #endif
 
 #ifndef PIN_MISO
-#define PIN_MISO 	MISO
+#define PIN_MISO    MISO
 #endif
 
 #ifndef PIN_SCK
-#define PIN_SCK 	SCK
+#define PIN_SCK     SCK
 #endif
 
 
@@ -154,7 +154,7 @@ void setup() {
 
 
 #define PTIME 30
-static void pulse( int pin, int times ) {
+static void pulse( int8_t pin, int8_t times ) {
     do {
         digitalWrite( pin, HIGH );
         delay( PTIME );
@@ -172,15 +172,15 @@ static bool use_arduino_protocol = false; // use stk500v1 as default
 static uint16_t here;
 
 // global block storage for cmd, flash and eeprom data
-static uint8_t buff[256];
+static uint8_t buff[ 256 ];
 
 // the three signature bytes
-static uint8_t sig[3];
+static uint8_t sig[ SIG_SIZE ];
 
 // default wait delay before writing next EEPROM location
 // can be adapted according to device signature
-const int WAIT_DELAY_EEPROM_DEFAULT = 10;
-static int wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;
+const int16_t WAIT_DELAY_EEPROM_DEFAULT = 10;
+static int16_t wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;
 
 
 static uint16_t buff_get_16( uint16_t addr ) {
@@ -272,8 +272,8 @@ void loop( void ) {
 
 
 static void avrisp() {
-    uint8_t ch = getch();
-    switch ( ch ) {
+    uint8_t cmd_byte = getch();
+    switch ( cmd_byte ) {
         // Use this command to try to regain synchronization when sync is lost.
         // Send this command until Resp_STK_INSYNC is received.
         // Cmnd_STK_GET_SYNC, Sync_CRC_EOP
@@ -436,8 +436,8 @@ static void avrisp() {
 ////////////////////////////////////////////////////////////////////////////////
 
 
-static void stk_get_parameter( uint8_t c ) {
-    switch ( c ) {
+static void stk_get_parameter( uint8_t parm ) {
+    switch ( parm ) {
         case Parm_STK_HW_VER:       // 0x80
             byte_reply( HWVER );
             break;
@@ -501,7 +501,7 @@ static void stk_set_device() {
 static void stk_set_device_ext() {
     uint8_t n_extparms = getch() - 1;  // commandsize = n_extparms + 1;
     fill( n_extparms );
-    param.eeprompagesize = buff[0];
+    param.eeprompagesize = buff[ 0 ];
 }
 
 
@@ -515,8 +515,8 @@ static void stk_enter_progmode() {
     use_arduino_protocol = false;
 
     // clear signature bytes
-    for ( uint8_t iii = 0; iii < 3; ++iii )
-        sig[iii] = 0;
+    for ( uint8_t iii = 0; iii < SIG_SIZE; ++iii )
+        sig[ iii ] = 0;
 
     // Reset target before driving PIN_SCK or PIN_MOSI
 
@@ -540,9 +540,9 @@ static void stk_enter_progmode() {
     delayMicroseconds( 100 );
     reset_target( true );
 
-    // Send the enable programming command:
+    // Send the enable programming command: 0xAC, 0x53, 0x00, 0x00
     delay( 50 ); // datasheet: must be > 20 msec
-    spi_transaction( ISP_ENTER_PMODE_4BYTE );  // 0xAC, 0x53, 0x00, 0x00 Programming enable
+    spi_transaction( ISP_ENTER_PMODE_BYTE_0, ISP_ENTER_PMODE_BYTE_1, 0, 0 );
     digitalWrite( LED_PMODE, HIGH );
     pmode = true;
 }
@@ -559,21 +559,21 @@ static void stk_leave_progmode() {
     digitalWrite( LED_PMODE, LOW );
     pmode = false;
     use_arduino_protocol = false; // switch back to default stk500v1 protocol
-    for ( uint8_t iii = 0; iii < 3; ++iii )
-        sig[iii] = 0; // clear signature bytes
+    for ( uint8_t iii = 0; iii < SIG_SIZE; ++iii )
+        sig[ iii ] = 0; // clear signature bytes
 }
 
 
 // Cmnd_STK_UNIVERSAL, byte1, byte2, byte3, byte4, Sync_CRC_EOP
 static void stk_universal() {
     fill( 4 );
-    uint8_t reply = spi_transaction( buff[0], buff[1], buff[2], buff[3] );
+    uint8_t reply = spi_transaction( buff[ 0 ], buff[ 1 ], buff[ 2 ], buff[ 3 ] );
     byte_reply( reply );
     // check if read sig byte #n: 0x30, 0, n, 0
-    if ( ISP_READ_SIG == buff[0] && buff[2] < 3 ) // read one signature byte
-        sig[buff[2]] = reply;
-    if ( sig[0] && sig[1] && sig[2] ) // all sig bytes available
-        hack_eeprom_delay(); // shorter delay for newer parts
+    if ( ISP_READ_SIG == buff[ 0 ] && buff[ 2 ] < SIG_SIZE ) // read one signature byte
+        sig[ buff[ 2 ] ] = reply;
+    if ( sig[ 0 ] && sig[ 1 ] && sig[ 2 ] ) // all sig bytes available
+        hack_eeprom_delay(); // set shorter delay if this is a newer parts
 }
 
 
@@ -588,7 +588,7 @@ static void stk_prog_data() {
     }
     if ( data != read_eeprom_byte( ee_addr ) ) { // do we need to write the data?
         spi_transaction( ISP_WRITE_EEPROM,
-                        ( ee_addr >> 8 ) & 0xFF,
+                        ee_addr >> 8 & 0xFF,
                         ee_addr & 0xFF,
                         data ); // 0xC0
         delay( wait_delay_EEPROM );
@@ -599,20 +599,20 @@ static void stk_prog_data() {
 
 // (Cmnd_STK_PROG_PAGE,) bytes_high, bytes_low, memtype, (data, Sync_CRC_EOP)
 static void stk_prog_page() {
-    char result = ( char ) Resp_STK_FAILED;
-    unsigned int length = 256 * getch();
+    uint8_t result = Resp_STK_FAILED;
+    uint16_t length = 256 * getch();
     length += getch();
-    char memtype = getch();
+    uint8_t memtype = getch();
     // flash memory @here, (length) bytes
     if ( memtype == 'F' ) {
         write_flash( length );
         return;
     }
     if ( memtype == 'E' ) {
-        result = ( char )write_eeprom( length );
+        result = write_eeprom( length );
         if ( Sync_CRC_EOP == getch() ) {
             Serial.write( Resp_STK_INSYNC );
-            Serial.print( result );
+            Serial.write( result );
         } else {
             ISPError = true;
             Serial.write( Resp_STK_NOSYNC );
@@ -626,10 +626,10 @@ static void stk_prog_page() {
 
 // (Cmnd_STK_READ_PAGE,) bytes_high, bytes_low, memtype, Sync_CRC_EOP
 static void stk_read_page() {
-    char result = ( char )Resp_STK_FAILED;
-    int length = 256 * getch();
+    uint8_t result = Resp_STK_FAILED;
+    uint16_t length = 256 * getch();
     length += getch();
-    char memtype = getch();
+    uint8_t memtype = getch();
     if ( Sync_CRC_EOP != getch() ) {
         ISPError = true;
         Serial.write( Resp_STK_NOSYNC );
@@ -642,7 +642,7 @@ static void stk_read_page() {
     if ( memtype == 'E' ) {
         result = read_eeprom_page( length );
     }
-    Serial.print( result );
+    Serial.write( result );
 }
 
 
@@ -660,9 +660,9 @@ static void stk_read_sign() {
 #endif
 
     Serial.write( Resp_STK_INSYNC );
-    for ( uint8_t iii = 0; iii < 3; ++iii ) {
-        sig[iii] = spi_transaction( ISP_READ_SIG, 0x00, iii, 0x00 ); // 0x30 sig byte iii
-        Serial.write( sig[iii] );
+    for ( uint8_t iii = 0; iii < SIG_SIZE; ++iii ) {
+        sig[ iii ] = spi_transaction( ISP_READ_SIG, 0x00, iii, 0x00 ); // 0x30 sig byte iii
+        Serial.write( sig[ iii ] );
     }
     Serial.write( Resp_STK_OK );
     hack_eeprom_delay();
@@ -672,7 +672,7 @@ static void stk_read_sign() {
 ////////////////////////////////////////////////////////////////////////////////
 
 
-static void write_flash( int length ) {
+static void write_flash( uint16_t length ) {
     fill( length );
     if ( Sync_CRC_EOP == getch() ) {
         Serial.write( Resp_STK_INSYNC );
@@ -684,16 +684,16 @@ static void write_flash( int length ) {
 }
 
 
-static uint8_t write_flash_pages( int length ) {
-    int x = 0;
-    unsigned int page = current_page();
-    while ( x < length ) {
+static uint8_t write_flash_pages( uint16_t length ) {
+    uint16_t buff_idx = 0;
+    uint16_t page = current_page();
+    while ( buff_idx < length ) {
         if ( page != current_page() ) {
             write_flash_page( page );
             page = current_page();
         }
-        load_flash_page( LOW, here, buff[x++] );
-        load_flash_page( HIGH, here, buff[x++] );
+        load_flash_page( LOW, here, buff[ buff_idx++ ] );
+        load_flash_page( HIGH, here, buff[ buff_idx++ ] );
         here++;
     }
 
@@ -703,7 +703,7 @@ static uint8_t write_flash_pages( int length ) {
 }
 
 
-static void load_flash_page( uint8_t hilo, unsigned int addr, uint8_t data ) {
+static void load_flash_page( uint8_t hilo, uint16_t addr, uint8_t data ) {
     spi_transaction( ISP_LOAD_PROG_PAGE + 8 * hilo,
                      addr >> 8 & 0xFF,
                      addr & 0xFF,
@@ -711,28 +711,32 @@ static void load_flash_page( uint8_t hilo, unsigned int addr, uint8_t data ) {
 }
 
 
-static void write_flash_page( unsigned int addr ) {
+static void write_flash_page( uint16_t addr ) {
     spi_transaction( ISP_WRITE_PROG_PAGE,
-                     ( addr >> 8 ) & 0xFF,
+                     addr >> 8 & 0xFF,
                      addr & 0xFF,
                      0 ); // 0x4C
 }
 
 
-static unsigned int current_page() {
+static uint16_t current_page() {
+#if 1
     if ( param.pagesize == 32 ) {
-        return here & 0xFFFFFFF0;
+        return here & 0xFFF0;
     }
     if ( param.pagesize == 64 ) {
-        return here & 0xFFFFFFE0;
+        return here & 0xFFE0;
     }
     if ( param.pagesize == 128 ) {
-        return here & 0xFFFFFFC0;
+        return here & 0xFFC0;
     }
     if ( param.pagesize == 256 ) {
-        return here & 0xFFFFFF80;
+        return here & 0xFF80;
     }
     return here;
+#else
+    return here & ~( param.pagesize / 2 - 1 );
+#endif
 }
 
 
@@ -763,7 +767,7 @@ static uint8_t write_eeprom( uint16_t length ) {
 
 static void load_eeprom_page( uint16_t addr, uint8_t data ) {
     spi_transaction( ISP_LOAD_EEPROM_PAGE,
-                     ( addr >> 8 ) & 0xFF,
+                     addr >> 8 & 0xFF,
                      addr & 0xFF,
                      data ); // 0xC1
 }
@@ -771,14 +775,14 @@ static void load_eeprom_page( uint16_t addr, uint8_t data ) {
 
 static void write_eeprom_page( uint16_t addr ) {
     spi_transaction( ISP_WRITE_EEPROM_PAGE,
-                     ( addr >> 8 ) & 0xFF,
+                     addr >> 8 & 0xFF,
                      addr & 0xFF,
                      0 ); // 0xC2
 }
 
 
-static char read_flash_page( int length ) {
-    for ( int x = 0; x < length; x += 2 ) {
+static uint8_t read_flash_page( uint16_t length ) {
+    for ( uint16_t byte_idx = 0; byte_idx < length; byte_idx += 2 ) {
         Serial.write( read_flash_byte( LOW, here ) );
         Serial.write( read_flash_byte( HIGH, here ) );
         here++;
@@ -787,32 +791,32 @@ static char read_flash_page( int length ) {
 }
 
 
-static uint8_t read_flash_byte( uint8_t hilo, unsigned int addr ) {
+static uint8_t read_flash_byte( uint8_t hilo, uint16_t addr ) {
     return spi_transaction( ISP_READ_PROG + hilo * 8,
-                            ( addr >> 8 ) & 0xFF,
+                            addr >> 8 & 0xFF,
                             addr & 0xFF,
                             0xFF ); // 0x20
 }
 
 
-static char read_eeprom_page( int length ) {
-    int start = here; // address of EEPROM
+static uint8_t read_eeprom_page( uint16_t length ) {
+    uint16_t start = here; // address of EEPROM
     if ( use_arduino_protocol ) {
         // arduino bootloader protocol sends word addresses also for EEPROM
         // calculate the EEPROM byte address
         start *= 2;
     }
-    for ( int x = 0; x < length; x++ ) {
-        int addr = start + x;
+    for ( uint16_t byte_idx = 0; byte_idx < length; byte_idx++ ) {
+        uint16_t addr = start + byte_idx;
         Serial.write( read_eeprom_byte( addr ) );
     }
     return Resp_STK_OK;
 }
 
 
-static uint8_t read_eeprom_byte( unsigned int addr ) {
+static uint8_t read_eeprom_byte( uint16_t addr ) {
     return spi_transaction( ISP_READ_EEPROM,
-                            ( addr >> 8 ) & 0xFF,
+                            addr >> 8 & 0xFF,
                             addr & 0xFF,
                             0xFF ); // 0xA0
 }
@@ -840,9 +844,9 @@ static uint8_t getch() {
 }
 
 
-static void fill( int n ) {
-    for ( int x = 0; x < n; x++ ) {
-        buff[x] = getch();
+static void fill( uint16_t n ) {
+    for ( uint16_t idx = 0; idx < n; ++idx ) {
+        buff[ idx ] = getch();
     }
 }
 
@@ -872,7 +876,7 @@ static void byte_reply( uint8_t b ) {
 
 static void hack_eeprom_delay() {
     // HACK: set short eeprom delay 4 ms for newer devices instead of 10 ms
-    const int WAIT_DELAY_EEPROM_FAST = 4;
+    const uint16_t WAIT_DELAY_EEPROM_FAST = 4;
     wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;              // set default value
     if ( 0x1e == sig[0] ) {                                     // valid AVR parts
         if ( 0x95 == sig[1] ) {                                 // 32K flash parts
