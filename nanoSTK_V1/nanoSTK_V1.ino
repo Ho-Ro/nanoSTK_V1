@@ -580,17 +580,19 @@ static void stk_universal() {
 // (Cmnd_STK_PROG_DATA,) data, Sync_CRC_EOP
 static void stk_prog_data() {
     uint8_t data = getch();
-    uint16_t addr = here; // address of EEPROM
+    uint16_t ee_addr = here; // address of EEPROM
     if ( use_arduino_protocol ) {
         // arduino bootloader protocol sends word addresses also for EEPROM
         // calculate the EEPROM byte address
-        addr *= 2;
+        ee_addr *= 2;
     }
-    spi_transaction( ISP_WRITE_EEPROM,
-                     ( addr >> 8 ) & 0xFF,
-                     addr & 0xFF,
-                     data ); // 0xC0
-    delay( wait_delay_EEPROM );
+    if ( data != read_eeprom_byte( ee_addr ) ) { // do we need to write the data?
+        spi_transaction( ISP_WRITE_EEPROM,
+                        ( ee_addr >> 8 ) & 0xFF,
+                        ee_addr & 0xFF,
+                        data ); // 0xC0
+        delay( wait_delay_EEPROM );
+    }
     empty_reply();
 }
 
@@ -734,26 +736,32 @@ static unsigned int current_page() {
 }
 
 
-static uint8_t write_eeprom( unsigned int length ) {
-    unsigned int start = here; // address of EEPROM
+static uint8_t write_eeprom( uint16_t length ) {
+    uint16_t ee_addr_wr = here; // write address of EEPROM
     if ( use_arduino_protocol ) {
         // arduino bootloader protocol sends word addresses also for EEPROM
         // calculate the EEPROM byte address
-        start *= 2;
+        ee_addr_wr *= 2;
     }
-    fill( length );
-    for ( unsigned int x = 0; x < length; x++ ) {
-        load_eeprom_page( x, buff[x] );
+    fill( length ); // get EEPROM page data
+    uint16_t ee_addr_rd = ee_addr_wr; // read address of EEPROM
+    bool page_has_changed = false;
+    for ( uint16_t pg_idx = 0; pg_idx < length; ++pg_idx ) {
+        uint8_t data = buff[ pg_idx ];
+        if ( data != read_eeprom_byte( ee_addr_rd++ ) ) {
+            load_eeprom_page( pg_idx, data );
+            page_has_changed = true;
+        }
     }
-
-    write_eeprom_page( start );
-    delay( wait_delay_EEPROM );
-
+    if ( page_has_changed ) {
+        write_eeprom_page( ee_addr_wr );
+        delay( wait_delay_EEPROM );
+    }
     return Resp_STK_OK;
 }
 
 
-static void load_eeprom_page( unsigned int addr, uint8_t data ) {
+static void load_eeprom_page( uint16_t addr, uint8_t data ) {
     spi_transaction( ISP_LOAD_EEPROM_PAGE,
                      ( addr >> 8 ) & 0xFF,
                      addr & 0xFF,
@@ -761,7 +769,7 @@ static void load_eeprom_page( unsigned int addr, uint8_t data ) {
 }
 
 
-static void write_eeprom_page( unsigned int addr ) {
+static void write_eeprom_page( uint16_t addr ) {
     spi_transaction( ISP_WRITE_EEPROM_PAGE,
                      ( addr >> 8 ) & 0xFF,
                      addr & 0xFF,
