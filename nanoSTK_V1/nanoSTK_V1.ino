@@ -31,9 +31,9 @@
 // HW version 2
 #define HWVER       2
 
-// SW version 1.23
+// SW version 1.24
 #define SWMAJ       1
-#define SWMIN       23
+#define SWMIN       24
 
 
 // This program uses the original "stk500v1" protocol with byte addresses for EEPROM access.
@@ -591,7 +591,7 @@ static void stk_prog_data() {
                         ee_addr >> 8 & 0xFF,
                         ee_addr & 0xFF,
                         data ); // 0xC0
-        delay( wait_delay_EEPROM );
+        isp_delay( wait_delay_EEPROM );
     }
     empty_reply();
 }
@@ -759,7 +759,7 @@ static uint8_t write_eeprom( uint16_t length ) {
     }
     if ( page_has_changed ) {
         write_eeprom_page( ee_addr_wr );
-        delay( wait_delay_EEPROM );
+        isp_delay( wait_delay_EEPROM );
     }
     return Resp_STK_OK;
 }
@@ -822,9 +822,20 @@ static uint8_t read_eeprom_byte( uint16_t addr ) {
 }
 
 
+static uint32_t milli_target;
+
+// set delay target for next ISP access
+static void isp_delay( uint8_t delay ) {
+    milli_target = millis() + delay;
+}
+
+
 // transfer 4 bytes via ISP, returns 1 byte (last response)
 // values according data sheet section "Serial Programming Instruction Set"
 static uint8_t spi_transaction( uint8_t a, uint8_t b, uint8_t c, uint8_t d ) {
+    uint32_t wait = milli_target - millis();
+    if ( wait <= 50 )  // delay not yet finished
+        delay( wait ); // wait before next SPI transfer
     SPI.transfer( a );
     SPI.transfer( b );
     SPI.transfer( c );
