@@ -13,6 +13,26 @@
 // This software turns the Arduino Nano into an AVR ISP using the following Arduino pins:
 //
 
+
+#include "Arduino.h"
+
+#include "SPI.h"
+
+// AVR061 - STK500 Communication Protocol
+#include "AVR061_command.h"
+
+// AVR910 - In-System Programming
+#include "AVR910_ISP.h"
+
+
+// HW version 2
+#define HWVER       2
+
+// SW version 1.24
+#define SWMAJ       1
+#define SWMIN       24
+
+
 // By default, the hardware SPI pins MISO, MOSI and SCK are used to communicate
 // with the target. On all Arduinos, these pins can be found on the ICSP/SPI header:
 //
@@ -25,40 +45,14 @@
 // Required HW change:
 // Cut ISP header /RESET connection and connect this pin to D10
 
-#define RESET       10
-
-
-// HW version 2
-#define HWVER       2
-
-// SW version 1.24
-#define SWMAJ       1
-#define SWMIN       24
-
-
-// This program uses the original "stk500v1" protocol with byte addresses for EEPROM access.
-// The modified "arduino" bootloader protocol addresses also the EEPROM word-wise.
-// To enable the automatic detection of the "arduino" protocol uncomment the next line.
-#define DETECT_ARDUINO_PROTOCOL
-
+const uint8_t RESET_ISP = 10;
 
 // Configure the baud rate:
 
 // #define BAUDRATE  19200
 #define BAUDRATE    115200
 // BAUDRATE > 115200 does not work!
-// #define BAUDRATE 230400
 
-
-#include "Arduino.h"
-
-#include "SPI.h"
-
-// AVR061 - STK500 Communication Protocol
-#include "AVR061_command.h"
-
-// AVR910 - In-System Programming
-#include "AVR910_ISP.h"
 
 // Configure SPI clock (in Hz).
 // E.g. for an ATtiny @ 128 kHz: the datasheet states that both the high and low
@@ -68,14 +62,14 @@
 //
 
 // fast clock for devices with XTAL (min. 8 MHz)
-#define SPI_CLOCK_FAST      ( 8000000UL / 6 )
+const uint32_t SPI_CLOCK_FAST = ( 8000000UL / 6 );
 // This gives a fast duration of 7.5 µs -> * STK500_XTAL / 8000000 -> 6.9
-#define SCK_DURATION_FAST   7
+const uint8_t SCK_DURATION_FAST = 7;
 
 // clock slow enough for an ATtiny85 @ 1 MHz selectable with jumper
-#define SPI_CLOCK_SLOW      ( 1000000UL / 6 )
+const uint32_t SPI_CLOCK_SLOW = ( 1000000UL / 6 );
 // This gives a duration of 60 µs -> * STK500_XTAL / 8000000 -> 55
-#define SCK_DURATION_SLOW   55
+const uint8_t SCK_DURATION_SLOW = 55;
 
 
 // start with slow SPI as default, will be set later in setup()
@@ -93,28 +87,31 @@ static uint8_t sck_duration = SCK_DURATION_SLOW;
 // 7: Write     - Writing to the target
 // 6: Read      - Reading from the targer
 // 5: PMode     - Target in programming mode
+//
+// Input to set the SPI speed
+// 2: SPI speed select
 
 
 #define HEARTBEAT
 #ifdef HEARTBEAT
 // Heartbeat LED
-#define LED_HB      9
+const uint8_t LED_HB    = 9;
 #endif
 
 // Error LED
-#define LED_ERROR   8
+const uint8_t LED_ERROR = 8;
 
 // Writing activity LED
-#define LED_WRITE   7
+const uint8_t LED_WRITE = 7;
 
 // Reading activity LED
-#define LED_READ    6
+const uint8_t LED_READ  = 6;
 
 // Programming mode LED
-#define LED_PMODE   5
+const uint8_t LED_PMODE = 5;
 
 // switch: open = FAST SPI mode, closed = SLOW SPI mode
-#define SPI_SPEED_SELECT 2
+const uint8_t SPI_SPEED_SELECT = 2;
 
 
 // By default, use hardware SPI pins:
@@ -129,6 +126,12 @@ static uint8_t sck_duration = SCK_DURATION_SLOW;
 #ifndef PIN_SCK
 #define PIN_SCK     SCK
 #endif
+
+
+// This program uses the original "stk500v1" protocol with byte addresses for EEPROM access.
+// The modified "arduino" bootloader protocol addresses also the EEPROM word-wise.
+// To enable the automatic detection of the "arduino" protocol uncomment the next line.
+#define DETECT_ARDUINO_PROTOCOL
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -169,7 +172,7 @@ static bool pmode = false;
 static bool use_arduino_protocol = false; // use stk500v1 as default
 
 // address for reading and writing, set by 'U' command Cmnd_STK_LOAD_ADDRESS
-static uint16_t here;
+static uint16_t target_addr;
 
 // global block storage for cmd, flash and eeprom data
 static uint8_t buff[ 256 ];
@@ -180,12 +183,13 @@ static uint8_t sig[ SIG_SIZE ];
 // default wait delay before writing next EEPROM location
 // can be adapted according to device signature
 const int16_t WAIT_DELAY_EEPROM_DEFAULT = 10;
+const uint16_t WAIT_DELAY_EEPROM_FAST = 4;
 static int16_t wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;
 
 
 static uint16_t buff_get_16( uint16_t addr ) {
     return buff[ addr ] * 0x100
-         + buff[ addr+ 1 ];
+         + buff[ addr + 1 ];
 }
 
 
@@ -193,7 +197,7 @@ static uint32_t buff_get_32( uint16_t addr ) {
     return buff[ addr ] * 0x01000000L
          + buff[ addr + 1 ] * 0x00010000L
          + buff[ addr + 2 ] * 0x00000100L
-         + buff[ addr + 3];
+         + buff[ addr + 3 ];
 }
 
 
@@ -206,12 +210,12 @@ typedef struct param {
     uint8_t selftimed;
     uint8_t lockbytes;
     uint8_t fusebytes;
-    uint8_t flashpoll;
-    uint8_t eeprompagesize;
+    uint16_t flashpoll;
     uint16_t eeprompoll;
     uint16_t pagesize;
     uint16_t eepromsize;
     uint32_t flashsize;
+    uint8_t eeprompagesize;
 }
 param_t;
 
@@ -219,7 +223,7 @@ static param_t param;
 
 
 #ifdef HEARTBEAT
-// this provides a heartbeat on pin 9, so you can tell the software is running.
+// this provides a heartbeat on pin 9, so you can see the software is running.
 static void heartbeat() {
     static int8_t hbdelta = 8;
     static uint8_t hbval = 128;
@@ -259,7 +263,7 @@ void loop( void ) {
 
 #ifdef HEARTBEAT
     // light the heartbeat LED
-      heartbeat();
+    heartbeat();
 #endif
 
     if ( Serial.available() ) {
@@ -272,8 +276,9 @@ void loop( void ) {
 
 
 static void avrisp() {
-    uint8_t cmd_byte = getch();
+    uint8_t cmd_byte = get_byte();
     switch ( cmd_byte ) {
+
         // Use this command to try to regain synchronization when sync is lost.
         // Send this command until Resp_STK_INSYNC is received.
         // Cmnd_STK_GET_SYNC, Sync_CRC_EOP
@@ -285,7 +290,7 @@ static void avrisp() {
         // The PC sends this command to check the communication channel.
         // Cmnd_STK_GET_SIGN_ON, Sync_CRC_EOP
         case Cmnd_STK_GET_SIGN_ON:                  // 0x31 '1'
-            if ( getch() == Sync_CRC_EOP ) {
+            if ( get_byte() == Sync_CRC_EOP ) {
                 Serial.write( Resp_STK_INSYNC );    // 0x14
                 Serial.print( "nanoSTK" );
                 Serial.write( Resp_STK_OK );
@@ -301,7 +306,7 @@ static void avrisp() {
         // See the parameters section of AVR061 for valid parameters and their meaning.
         // Cmnd_STK_GET_PARAMETER, parameter, Sync_CRC_EOP
         case Cmnd_STK_GET_PARAMETER:                // 0x41 'A'
-            stk_get_parameter( getch() );
+            stk_get_parameter( get_byte() );
             break;
 
         // Set the device Programming parameters for the current device.
@@ -311,7 +316,6 @@ static void avrisp() {
         // pagesizehigh, pagesizelow, eepromsizehigh, eepromsizelow, flashsize4, flashsize3,
         // flashsize2, flashsize1, Sync_CRC_EOP
         case Cmnd_STK_SET_DEVICE:                   // 0x42 'B'
-            fill( 20 );
             stk_set_device();
             empty_reply();
             break;
@@ -347,8 +351,7 @@ static void avrisp() {
         // Must always be used prior to Cmnd_STK_PROG_PAGE or Cmnd_STK_READ_PAGE.
         // Cmnd_STK_LOAD_ADDRESS, addr_low, addr_high, Sync_CRC_EOP
         case Cmnd_STK_LOAD_ADDRESS:                 // 0x55 'U' set address (word)
-            here = getch();
-            here += 256 * getch();
+            target_addr = get_word_LH(); // little endian!
             empty_reply();
             break;
 
@@ -367,10 +370,9 @@ static void avrisp() {
         // Program one word in FLASH memory.
         // Cmnd_STK_PROG_FLASH, flash_low, flash_high, Sync_CRC_EOP
         case Cmnd_STK_PROG_FLASH:                   // 0x60 '`'; unused
-            getch(); // flash_low
-            getch(); // flash_high
+            get_word_LH(); // flash_low, high
             ISPError = true;
-            if ( Sync_CRC_EOP == getch() ) {
+            if ( Sync_CRC_EOP == get_byte() ) {
                 Serial.write( Resp_STK_UNKNOWN );   // 0x12
             } else {
                 Serial.write( Resp_STK_NOSYNC );    // 0x15
@@ -407,6 +409,7 @@ static void avrisp() {
             break;
 
         // Read the three signature bytes.
+        // Used by arduino protocol, not used by stk500v1 protocol.
         // Cmnd_STK_READ_SIGN, Sync_CRC_EOP
         case Cmnd_STK_READ_SIGN:                    // 0x75 'u'
             digitalWrite( LED_READ, HIGH );
@@ -424,7 +427,7 @@ static void avrisp() {
         // anything else we will return STK_UNKNOWN
         default:
             ISPError = true;
-            if ( Sync_CRC_EOP == getch() ) {
+            if ( Sync_CRC_EOP == get_byte() ) {
                 Serial.write( Resp_STK_UNKNOWN );   // 0x12
             } else {
                 Serial.write( Resp_STK_NOSYNC );    // 0x15
@@ -473,7 +476,9 @@ static void stk_get_parameter( uint8_t parm ) {
 // pagesizehigh, pagesizelow, eepromsizehigh, eepromsizelow, flashsize4, flashsize3,
 // flashsize2, flashsize1, Sync_CRC_EOP
 static void stk_set_device() {
-    // call this after reading parameter packet into buff[]
+    // read parameter packet into buff[]
+    fill( 20 );
+
     param.devicecode = buff[0];
     param.revision   = buff[1];
     param.progtype   = buff[2];
@@ -482,24 +487,22 @@ static void stk_set_device() {
     param.selftimed  = buff[5];
     param.lockbytes  = buff[6];
     param.fusebytes  = buff[7];
-    param.flashpoll  = buff[8];
-    // ignore buff[9] (= buff[8])
-    // following are 16 bits (big endian)
+    // 16 bits (big endian)
+    param.flashpoll  = buff_get_16(  8 );
     param.eeprompoll = buff_get_16( 10 );
     param.pagesize   = buff_get_16( 12 );
     param.eepromsize = buff_get_16( 14 );
-
     // 32 bits flashsize (big endian)
-    param.flashsize = buff_get_32( 16 );
+    param.flashsize  = buff_get_32( 16 );
 
     // AVR devices have active low reset, AT89Sx are active high
     rst_active_high = ( param.devicecode >= 0xe0 );
 }
 
 
-// (Cmnd_SET_DEVICE_EXT,) commandsize, eeprompagesize, signalpagel, signalbs2, Synch_CRC_EOP
+// (Cmnd_SET_DEVICE_EXT,) commandsize, eeprompagesize, signalpagel, signalbs2, reset_disposition, Synch_CRC_EOP
 static void stk_set_device_ext() {
-    uint8_t n_extparms = getch() - 1;  // commandsize = n_extparms + 1;
+    uint8_t n_extparms = get_byte() - 1;  // commandsize = n_extparms + 1;
     fill( n_extparms );
     param.eeprompagesize = buff[ 0 ];
 }
@@ -521,17 +524,17 @@ static void stk_enter_progmode() {
     // Reset target before driving PIN_SCK or PIN_MOSI
 
     // SPI.begin() will configure SS as output, so SPI master mode is selected.
-    // We have defined RESET as pin 10, which for many Arduinos is not the SS pin.
-    // So we have to configure RESET as output here,
+    // We have defined RESET_ISP as pin 10, which for many Arduinos is not the SS pin.
+    // So we have to configure RESET_ISP as output here,
     // (reset_target() first sets the correct level)
     reset_target( true );
-    pinMode( RESET, OUTPUT );
+    pinMode( RESET_ISP, OUTPUT );
     SPI.begin();
     SPI.beginTransaction( SPISettings( spi_clock, MSBFIRST, SPI_MODE0 ) );
 
     // See AVR datasheets, chapter "SERIAL_PRG Programming Algorithm":
 
-    // Pulse RESET after PIN_SCK is low:
+    // Pulse RESET_ISP after PIN_SCK is low:
     digitalWrite( PIN_SCK, LOW );
     delay( 20 ); // discharge PIN_SCK, value arbitrarily chosen
     reset_target( false );
@@ -555,7 +558,7 @@ static void stk_leave_progmode() {
     pinMode( PIN_MOSI, INPUT );
     pinMode( PIN_SCK, INPUT );
     reset_target( false );
-    pinMode( RESET, INPUT );
+    pinMode( RESET_ISP, INPUT );
     digitalWrite( LED_PMODE, LOW );
     pmode = false;
     use_arduino_protocol = false; // switch back to default stk500v1 protocol
@@ -578,20 +581,20 @@ static void stk_universal() {
 
 
 // (Cmnd_STK_PROG_DATA,) data, Sync_CRC_EOP
+// not used by avrdude
 static void stk_prog_data() {
-    uint8_t data = getch();
-    uint16_t ee_addr = here; // address of EEPROM
+    uint8_t data = get_byte();
+    uint16_t ee_addr = target_addr; // address of EEPROM
     if ( use_arduino_protocol ) {
         // arduino bootloader protocol sends word addresses also for EEPROM
-        // calculate the EEPROM byte address
-        ee_addr *= 2;
+        ee_addr *= 2; // convert to EEPROM byte address
     }
     if ( data != read_eeprom_byte( ee_addr ) ) { // do we need to write the data?
         spi_transaction( ISP_WRITE_EEPROM,
                         ee_addr >> 8 & 0xFF,
                         ee_addr & 0xFF,
                         data ); // 0xC0
-        isp_delay( wait_delay_EEPROM );
+        start_isp_delay( wait_delay_EEPROM );
     }
     empty_reply();
 }
@@ -600,17 +603,16 @@ static void stk_prog_data() {
 // (Cmnd_STK_PROG_PAGE,) bytes_high, bytes_low, memtype, (data, Sync_CRC_EOP)
 static void stk_prog_page() {
     uint8_t result = Resp_STK_FAILED;
-    uint16_t length = 256 * getch();
-    length += getch();
-    uint8_t memtype = getch();
-    // flash memory @here, (length) bytes
+    uint16_t length = get_word_HL(); // big endian!
+    uint8_t memtype = get_byte();
+    // flash memory @target_addr, (length) bytes
     if ( memtype == 'F' ) {
         write_flash( length );
         return;
     }
     if ( memtype == 'E' ) {
         result = write_eeprom( length );
-        if ( Sync_CRC_EOP == getch() ) {
+        if ( Sync_CRC_EOP == get_byte() ) {
             Serial.write( Resp_STK_INSYNC );
             Serial.write( result );
         } else {
@@ -627,10 +629,9 @@ static void stk_prog_page() {
 // (Cmnd_STK_READ_PAGE,) bytes_high, bytes_low, memtype, Sync_CRC_EOP
 static void stk_read_page() {
     uint8_t result = Resp_STK_FAILED;
-    uint16_t length = 256 * getch();
-    length += getch();
-    uint8_t memtype = getch();
-    if ( Sync_CRC_EOP != getch() ) {
+    uint16_t length = get_word_HL(); // big endian!
+    uint8_t memtype = get_byte();
+    if ( Sync_CRC_EOP != get_byte() ) {
         ISPError = true;
         Serial.write( Resp_STK_NOSYNC );
         return;
@@ -649,7 +650,7 @@ static void stk_read_page() {
 // used with arduino protocol, stk500v1 uses three stk_universal() calls instead
 // (Cmnd_STK_READ_SIGN,) Sync_CRC_EOP
 static void stk_read_sign() {
-    if ( Sync_CRC_EOP != getch() ) {
+    if ( Sync_CRC_EOP != get_byte() ) {
         ISPError = true;
         Serial.write( Resp_STK_NOSYNC );
         return;
@@ -674,7 +675,7 @@ static void stk_read_sign() {
 
 static void write_flash( uint16_t length ) {
     fill( length );
-    if ( Sync_CRC_EOP == getch() ) {
+    if ( Sync_CRC_EOP == get_byte() ) {
         Serial.write( Resp_STK_INSYNC );
         Serial.write( write_flash_pages( length ) );
     } else {
@@ -692,13 +693,11 @@ static uint8_t write_flash_pages( uint16_t length ) {
             write_flash_page( page );
             page = current_page();
         }
-        load_flash_page( LOW, here, buff[ buff_idx++ ] );
-        load_flash_page( HIGH, here, buff[ buff_idx++ ] );
-        here++;
+        load_flash_page( LOW, target_addr, buff[ buff_idx++ ] );
+        load_flash_page( HIGH, target_addr, buff[ buff_idx++ ] );
+        ++target_addr;
     }
-
     write_flash_page( page );
-
     return Resp_STK_OK;
 }
 
@@ -722,30 +721,29 @@ static void write_flash_page( uint16_t addr ) {
 static uint16_t current_page() {
 #if 1
     if ( param.pagesize == 32 ) {
-        return here & 0xFFF0;
+        return target_addr & 0xFFF0;
     }
     if ( param.pagesize == 64 ) {
-        return here & 0xFFE0;
+        return target_addr & 0xFFE0;
     }
     if ( param.pagesize == 128 ) {
-        return here & 0xFFC0;
+        return target_addr & 0xFFC0;
     }
     if ( param.pagesize == 256 ) {
-        return here & 0xFF80;
+        return target_addr & 0xFF80;
     }
-    return here;
+    return target_addr;
 #else
-    return here & ~( param.pagesize / 2 - 1 );
+    return target_addr & ~( param.pagesize / 2 - 1 );
 #endif
 }
 
 
 static uint8_t write_eeprom( uint16_t length ) {
-    uint16_t ee_addr_wr = here; // write address of EEPROM
+    uint16_t ee_addr_wr = target_addr; // write address of EEPROM
     if ( use_arduino_protocol ) {
         // arduino bootloader protocol sends word addresses also for EEPROM
-        // calculate the EEPROM byte address
-        ee_addr_wr *= 2;
+        ee_addr_wr *= 2; // convert to EEPROM byte address of page
     }
     fill( length ); // get EEPROM page data
     uint16_t ee_addr_rd = ee_addr_wr; // read address of EEPROM
@@ -753,13 +751,13 @@ static uint8_t write_eeprom( uint16_t length ) {
     for ( uint16_t pg_idx = 0; pg_idx < length; ++pg_idx ) {
         uint8_t data = buff[ pg_idx ];
         if ( data != read_eeprom_byte( ee_addr_rd++ ) ) {
-            load_eeprom_page( pg_idx, data );
+            load_eeprom_page( pg_idx, data ); // change this byte
             page_has_changed = true;
         }
     }
     if ( page_has_changed ) {
-        write_eeprom_page( ee_addr_wr );
-        isp_delay( wait_delay_EEPROM );
+        write_eeprom_page( ee_addr_wr ); // only "loaded" bytes will be written
+        start_isp_delay( wait_delay_EEPROM );
     }
     return Resp_STK_OK;
 }
@@ -783,9 +781,9 @@ static void write_eeprom_page( uint16_t addr ) {
 
 static uint8_t read_flash_page( uint16_t length ) {
     for ( uint16_t byte_idx = 0; byte_idx < length; byte_idx += 2 ) {
-        Serial.write( read_flash_byte( LOW, here ) );
-        Serial.write( read_flash_byte( HIGH, here ) );
-        here++;
+        Serial.write( read_flash_byte( LOW, target_addr ) );
+        Serial.write( read_flash_byte( HIGH, target_addr ) );
+        ++target_addr;
     }
     return Resp_STK_OK;
 }
@@ -800,13 +798,13 @@ static uint8_t read_flash_byte( uint8_t hilo, uint16_t addr ) {
 
 
 static uint8_t read_eeprom_page( uint16_t length ) {
-    uint16_t start = here; // address of EEPROM
+    uint16_t start = target_addr; // address of EEPROM
     if ( use_arduino_protocol ) {
         // arduino bootloader protocol sends word addresses also for EEPROM
         // calculate the EEPROM byte address
         start *= 2;
     }
-    for ( uint16_t byte_idx = 0; byte_idx < length; byte_idx++ ) {
+    for ( uint16_t byte_idx = 0; byte_idx < length; ++byte_idx ) {
         uint16_t addr = start + byte_idx;
         Serial.write( read_eeprom_byte( addr ) );
     }
@@ -825,7 +823,7 @@ static uint8_t read_eeprom_byte( uint16_t addr ) {
 static uint32_t milli_target;
 
 // set delay target for next ISP access
-static void isp_delay( uint8_t delay ) {
+static void start_isp_delay( uint8_t delay ) {
     milli_target = millis() + delay;
 }
 
@@ -834,7 +832,7 @@ static void isp_delay( uint8_t delay ) {
 // values according data sheet section "Serial Programming Instruction Set"
 static uint8_t spi_transaction( uint8_t a, uint8_t b, uint8_t c, uint8_t d ) {
     uint32_t wait = milli_target - millis();
-    if ( wait <= 50 )  // delay not yet finished
+    if ( wait < 256 )  // delay not yet finished
         delay( wait ); // wait before next SPI transfer
     SPI.transfer( a );
     SPI.transfer( b );
@@ -844,26 +842,40 @@ static uint8_t spi_transaction( uint8_t a, uint8_t b, uint8_t c, uint8_t d ) {
 
 
 static void reset_target( bool reset ) {
-    digitalWrite( RESET, ( ( reset && rst_active_high ) || ( !reset && !rst_active_high ) ) ? HIGH : LOW );
+    digitalWrite( RESET_ISP, ( ( reset && rst_active_high ) || ( !reset && !rst_active_high ) ) ? HIGH : LOW );
 }
 
 
-static uint8_t getch() {
+static uint8_t get_byte() {
     while ( !Serial.available() )
         ; // wait
     return Serial.read();
 }
 
 
+static uint16_t get_word_LH() { // little endian
+    uint16_t lo = get_byte();
+    uint16_t hi = get_byte();
+    return 0x100 * hi + lo;
+}
+
+
+static uint16_t get_word_HL() { // big endian
+    uint16_t hi = get_byte();
+    uint16_t lo = get_byte();
+    return 0x100 * hi + lo;
+}
+
+
 static void fill( uint16_t n ) {
     for ( uint16_t idx = 0; idx < n; ++idx ) {
-        buff[ idx ] = getch();
+        buff[ idx ] = get_byte();
     }
 }
 
 
 static void empty_reply() {
-    if ( Sync_CRC_EOP == getch() ) {
+    if ( Sync_CRC_EOP == get_byte() ) {
         Serial.write( Resp_STK_INSYNC );
         Serial.write( Resp_STK_OK );
     } else {
@@ -874,7 +886,7 @@ static void empty_reply() {
 
 
 static void byte_reply( uint8_t b ) {
-    if ( Sync_CRC_EOP == getch() ) {
+    if ( Sync_CRC_EOP == get_byte() ) {
         Serial.write( Resp_STK_INSYNC );
         Serial.write( b );
         Serial.write( Resp_STK_OK );
@@ -887,7 +899,6 @@ static void byte_reply( uint8_t b ) {
 
 static void hack_eeprom_delay() {
     // HACK: set short eeprom delay 4 ms for newer devices instead of 10 ms
-    const uint16_t WAIT_DELAY_EEPROM_FAST = 4;
     wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;              // set default value
     if ( 0x1e == sig[0] ) {                                     // valid AVR parts
         if ( 0x95 == sig[1] ) {                                 // 32K flash parts
