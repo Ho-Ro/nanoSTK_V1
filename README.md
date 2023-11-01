@@ -44,9 +44,11 @@ With this setup the modified nanoSTK provides the supply voltage of 5 V to the t
 
 ## Usage
 
+The communication uses the `stk500v1` protocol over serial USB with a data rate of 115200 bps, this is the default speed of `avrdude`.
+
 ### Config File .avrduderc
 
-Put this file into your home directory to set the nanoSTK device as the default programmer:
+Put this file into your home directory (Linux) to set the nanoSTK device as the default programmer:
 
 ```
 # file ~/.avrduderc
@@ -61,12 +63,14 @@ default_serial = "/dev/ttyUSB0";
 A typical call for programming the file `firmware.hex` into an ATtiny 85 looks like this:
 
 ```sh
-avrdude -c stk500v1 -p t85 -U flash:w:firmware.hex:i
+avrdude -p t85 -U flash:w:firmware.hex:i
 ```
 
 This simple call
 
-    avrdude -p t85 -v
+```sh
+avrdude -p t85 -v
+```
 
 will show the programmer setup and device info for the ATtiny 85:
 
@@ -109,7 +113,7 @@ avrdude: Version 7.1
          Programmer Type : STK500
          Description     : Atmel STK500 version 1.x firmware
          Hardware Version: 2
-         Firmware Version: 1.21
+         Firmware Version: 1.24
          Vtarget         : 4.8 V
          Varef           : 0.0 V
          Oscillator      : Off
@@ -121,6 +125,20 @@ avrdude: device signature = 0x1e930b (probably t85)
 avrdude done.  Thank you.
 
 ```
+
+### Programming Speed
+
+The programming algorithms are optimised for speed:
+
+- unchanged EEPROM blocks are not programmed.
+- the total serial communication overhead is taken into account for the required programming delays.
+
+These times were measured on an ATmega328p and an ATtiny85 with random data after flash and EEPROM were filled with `0xFF`.
+
+Device | Flash/EEPROM | Flash write | Flash verify | EEPROM write | EEPROM verify
+-------|--------------|-------------|--------------|--------------|---------------
+m328p  | 32K / 1024   |      5.89 s |       4.36 s |       1.79 s |        1.79 s
+t85    | 8K / 512     |      1.91 s |       1.54 s |       0.90 s |        0.89 s
 
 ## Programming Protocol
 
@@ -146,7 +164,7 @@ The firmware automatically recognises the modified `arduino` protocol by its use
          Programmer Type : Arduino
          Description     : Arduino for bootloader using STK500 v1 protocol
          Hardware Version: 2
-         Firmware Version: 1.20
+         Firmware Version: 1.24
 
 avrdude: AVR device initialized and ready to accept instructions
 avrdude: device signature = 0x1e930b (probably t85)
