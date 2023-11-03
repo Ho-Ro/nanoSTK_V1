@@ -148,11 +148,11 @@ avrdude: Version 7.1
          Programmer Type : STK500
          Description     : Atmel STK500 version 1.x firmware
          Hardware Version: 2
-         Firmware Version: 1.24
+         Firmware Version: 1.25
          Vtarget         : 4.8 V
          Varef           : 0.0 V
          Oscillator      : Off
-         SCK period      : 7.6 us
+         SCK period      : 1.1 us
 
 avrdude: AVR device initialized and ready to accept instructions
 avrdude: device signature = 0x1e930b (probably t85)
@@ -172,8 +172,17 @@ These times were measured on an ATmega328p and an ATtiny85 with random data afte
 
 Device | Flash/EEPROM | Flash write | Flash verify | EEPROM write | EEPROM verify
 -------|--------------|-------------|--------------|--------------|---------------
-m328p  | 32K / 1024   |      5.89 s |       4.36 s |       1.79 s |        1.79 s
+m328p  | 32K / 1024   |      5.80 s |       4.36 s |       1.79 s |        1.79 s
 t85    | 8K / 512     |      1.91 s |       1.54 s |       0.90 s |        0.89 s
+
+### Programming Slow Targets
+
+When programming targets with a clock speed lower than 8 MHz the SPI can be slowed down from 1.3 MHz to 20 kHz,
+this allows to communicate with targets with a clock speed > 120 kHz. To slow down connect pin D2 with GND.
+
+### Providing External Clock
+
+To program a target without own clock generation, e.g. a processor on an adapter board, an external 200 kHz clock (5 V) is provided on pin D3.
 
 ## Programming Protocol
 
@@ -199,7 +208,7 @@ The firmware automatically recognises the modified `arduino` protocol by its use
          Programmer Type : Arduino
          Description     : Arduino for bootloader using STK500 v1 protocol
          Hardware Version: 2
-         Firmware Version: 1.24
+         Firmware Version: 1.25
 
 avrdude: AVR device initialized and ready to accept instructions
 avrdude: device signature = 0x1e930b (probably t85)

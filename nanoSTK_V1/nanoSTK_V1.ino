@@ -10,8 +10,6 @@
 // If you require a license, see
 // http://www.opensource.org/licenses/bsd-license.php
 //
-// This software turns the Arduino Nano into an AVR ISP using the following Arduino pins:
-//
 
 
 #include "Arduino.h"
@@ -28,11 +26,13 @@
 // HW version 2
 #define HWVER       2
 
-// SW version 1.24
+// SW version 1.25
 #define SWMAJ       1
-#define SWMIN       24
+#define SWMIN       25
 
 
+// This software turns the Arduino Nano into an AVR ISP using the following Arduino pins:
+//
 // By default, the hardware SPI pins MISO, MOSI and SCK are used to communicate
 // with the target. On all Arduinos, these pins can be found on the ICSP/SPI header:
 //
@@ -53,6 +53,8 @@ const uint8_t RESET_ISP = 10;
 #define BAUDRATE    115200
 // BAUDRATE > 115200 does not work!
 
+// this is the original xtal of STK500
+#define STK500_XTAL 7372800U
 
 // Configure SPI clock (in Hz).
 // E.g. for an ATtiny @ 128 kHz: the datasheet states that both the high and low
@@ -63,13 +65,13 @@ const uint8_t RESET_ISP = 10;
 
 // fast clock for devices with XTAL (min. 8 MHz)
 const uint32_t SPI_CLOCK_FAST = ( 8000000UL / 6 );
-// This gives a fast duration of 7.5 µs -> * STK500_XTAL / 8000000 -> 6.9
-const uint8_t SCK_DURATION_FAST = 7;
+// This gives a fast duration of 0.75 µs
+const uint8_t SCK_DURATION_FAST = 1;
 
-// clock slow enough for an ATtiny85 @ 1 MHz selectable with jumper
-const uint32_t SPI_CLOCK_SLOW = ( 1000000UL / 6 );
-// This gives a duration of 60 µs -> * STK500_XTAL / 8000000 -> 55
-const uint8_t SCK_DURATION_SLOW = 55;
+// clock slow enough for an ATtiny85 @ 128 kHz selectable with jumper
+const uint32_t SPI_CLOCK_SLOW = 20000; // ( 128000UL / 6 ) -> 21;
+// This gives a duration of 50 µs (* STK500_XTAL / 8 MHz -> 46)
+const uint8_t SCK_DURATION_SLOW = 46;
 
 
 // start with slow SPI as default, will be set later in setup()
@@ -87,6 +89,8 @@ static uint8_t sck_duration = SCK_DURATION_SLOW;
 // 7: Write     - Writing to the target
 // 6: Read      - Reading from the targer
 // 5: PMode     - Target in programming mode
+//
+// 3: Clk Out   - clock source for devices with external clock
 //
 // Input to set the SPI speed
 // 2: SPI speed select
@@ -109,6 +113,12 @@ const uint8_t LED_READ  = 6;
 
 // Programming mode LED
 const uint8_t LED_PMODE = 5;
+
+// 200 kHz output for devices with exteral clk
+#define EXT_CLK         200
+#ifdef EXT_CLK
+const uint8_t EXT_CLK_OUT   = 3;
+#endif
 
 // switch: open = FAST SPI mode, closed = SLOW SPI mode
 const uint8_t SPI_SPEED_SELECT = 2;
@@ -151,6 +161,9 @@ void setup() {
     pulse( LED_ERROR, 2 );
 #ifdef HEARTBEAT
     pinMode(LED_HB, OUTPUT);
+#endif
+#ifdef EXT_CLK
+    initTimer2();
 #endif
     select_spi_speed();
 }
@@ -300,6 +313,13 @@ static void avrisp() {
             }
             break;
 
+        // Set the value of a valid parameter in the STK500 starterkit.
+        // See the parameters section for valid parameters and their meaning.
+        // Cmnd_STK_SET_PARAMETER, parameter, value, Sync_CRC_EOP
+        case Cmnd_STK_SET_PARAMETER:                // 0x40 '@'
+            stk_set_parameter( get_byte() );
+            break;
+
         // Get the value of a valid parameter from the STK500 starterkit.
         // If the parameter is not used, the same parameter will be returned
         // together with a Resp_STK_FAILED response to indicate the error.
@@ -438,6 +458,32 @@ static void avrisp() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// currently the function does nothing, just reply with ok
+static void stk_set_parameter( uint8_t parm ) {
+    get_byte(); // value
+    switch ( parm ) {
+        case Parm_STK_VTARGET:          // 0x84
+            empty_reply();
+            break;
+        case Parm_STK_VADJUST:          // 0x85
+            empty_reply();
+            break;
+        case Parm_STK_OSC_PSCALE:       // 0x86
+            empty_reply();
+            break;
+        case Parm_STK_OSC_CMATCH:       // 0x87
+            empty_reply();
+            break;
+        case Parm_STK_RESET_DURATION:   // 0x88
+            empty_reply();
+            break;
+        case Parm_STK_SCK_DURATION:     // 0x89
+            empty_reply();
+            break;
+        default:
+            empty_reply();
+    }
+}
 
 static void stk_get_parameter( uint8_t parm ) {
     switch ( parm ) {
@@ -454,6 +500,15 @@ static void stk_get_parameter( uint8_t parm ) {
             byte_reply( get_V_target_10() );
             break;
         case Parm_STK_VADJUST:      // 0x85
+            byte_reply( 0 );
+            break;
+        case Parm_STK_OSC_PSCALE:   // 0x86
+            byte_reply( 0 );        // 1 -> active
+            break;
+        case Parm_STK_OSC_CMATCH:   // 0x87
+            byte_reply( 0 );        // 17 -> 200 kHz
+            break;
+        case Parm_STK_RESET_DURATION: // 0x88
             byte_reply( 0 );
             break;
         case Parm_STK_SCK_DURATION: // 0x89
@@ -940,3 +995,36 @@ static void select_spi_speed() {
         sck_duration = SCK_DURATION_SLOW;
     }
 }
+
+
+#ifdef EXT_CLK
+//--------------------------------------------------------------------------------
+// configTimer2
+// output 200 kHz rectangle at D3 as clock signal for devices with external clock
+//--------------------------------------------------------------------------------
+static void initTimer2() {
+    const uint16_t ocr2a = 16000 / 2 / EXT_CLK;
+
+    // Initialize Timer2
+    TCCR2A = 0;
+    TCCR2B = 0;
+    TCNT2 = 0;
+
+    // Set OC2B for Compare Match (digital pin3)
+    pinMode( EXT_CLK_OUT, OUTPUT );
+
+    bitSet( TCCR2A, COM2B1 ); // clear OC2B on up count compare match
+
+    // Set mode 5 -> Phase correct PWM to OCR2A counts up and down
+    bitSet( TCCR2A, WGM20 );
+    bitSet( TCCR2B, WGM22 );
+
+    // Set up prescaler to 001 = clk (16 MHz)
+    bitSet( TCCR2B, CS20 );
+    //bitClear(TCCR2B, CS21);
+    //bitClear(TCCR2B, CS22);
+
+    OCR2A = ocr2a; // Sets t = 2.5 µs up + 2.5 µs down -> freq = 200 kHz
+    OCR2B = ocr2a / 2; // 50% duty cycle, valid values: 0 (permanent low), 1..39, 40 (permanent high)
+}
+#endif
