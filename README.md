@@ -26,21 +26,56 @@ On all Arduinos, these pins are found on the ICSP/SPI header:
 #### Required HW Changes
 
 - Cut ISP header /RESET connection and connect this pin to D10.
-- Connect a capacitor of about 1μF between the /RESET line (+) of the nano and GND (-).
+- Connect a capacitor of about 3..10 μF between the /RESET line (+) of the nano and GND (-).
   This capacitor must be removed to reprogram the nanoSTK.
   It is therefore recommended to make the capacitor pluggable.
 
+With this setup the modified nanoSTK provides the supply voltage of 5 V to the target.
+
 #### Optional Modifications
 
-Put an LED (with resistor) on the following pins:
+Put LEDs (with resistor) on the following pins:
 
 - D9: Heartbeat - Indicates that the programmer is running
 - D8: Error     - An Error has occured - clear with programmer reset
 - D7: Write     - Writing to the target
-- D6: Read      - Reading from the targer
+- D6: Read      - Reading from the target
 - D5: PMode     - Target in programming mode
 
-With this setup the modified nanoSTK provides the supply voltage of 5 V to the target.
+D5 .. D8 are identical to the [ScratchMonkey](https://github.com/microtherion/ScratchMonkey) status LEDs.
+
+## Firmware Installation
+
+### Linux
+
+The source code was created and tested with the *Arduino* toolchain version 1.8.19 under Linux, *Debian stable*.
+The installation process is simple and straightforward when using the `Makefile` from the command line:
+
+- Remove the *reset capacitor* from your *nanoSTK* HW.
+- Connect the device to USB.
+- Enter `make upload`
+- Re-install the *reset capacitor*.
+
+The upload of the file `nanoSTK_V1.hex` with `make upload` only requires the `avrdude` tool.
+If the source code remains unchanged, the *Arduino* tool chain is not required.
+
+#### Firmware Modifications
+
+The `Makefile` takes care of changes to the source code files in `nanoSTK_V1`
+and rebuilds the file `nanoSTK_V1.hex` accordingly, using the *Arduino* cli interface - type `make`
+or follow the description below in the next section.
+
+### Other OS
+
+You can also use the Arduino tool chain, this should work on all supported operation systems.
+
+- Remove the *reset capacitor* from your *nanoSTK* HW.
+- Connect the device to USB.
+- Open `nanoSTK_V1/nanoSTK_V1.ino` with the Arduino tool chain.
+- Select `Tools/Board: "Arduino Nano"`.
+- Select the correct serial port.
+- Execute `Sketch/Upload` from the menu.
+- Reinstall the *reset capacitor*.
 
 ## Usage
 

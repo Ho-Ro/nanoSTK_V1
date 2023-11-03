@@ -6,29 +6,38 @@
 # make verify	- compare the hex file and the nano flash content
 # make clean	- remove all intermediate build artifacts (keep the final *.hex file)
 
+# The project
 PROJECT = nanoSTK_V1
 
+# The source code files
+INO = $(PROJECT)/$(PROJECT).ino
+HEADER = $(PROJECT)/*.h
+
+# The work space
 BUILD = build
 
-INO = $(PROJECT)/$(PROJECT).ino
-HEX = $(PROJECT).ino.hex
+# The firmware (in work space)
+INO.HEX = $(BUILD)/$(PROJECT).ino.hex
 
+# The final firmware - ready to install
+HEX = $(PROJECT).hex
 
+# This is the default target of the Makefile
 .PHONY:	hex
 hex: $(HEX)
 
-$(BUILD)/$(HEX): $(INO)
+$(INO.HEX): $(INO) $(HEADER) Makefile
 	arduino --pref build.path=$(BUILD) --verify $(INO) --verbose
 
-$(HEX):	$(BUILD)/$(HEX)
+$(HEX):	$(INO.HEX)
 	@cp $< $@
 
-.PHONY:	flash
-flash:	$(HEX)
+.PHONY:	upload
+upload:
 	avrdude -p m328p -c arduino -U flash:w:$(HEX)
 
 .PHONY:	verify
-verify:	$(HEX)
+verify:
 	avrdude -p m328p -c arduino -U flash:v:$(HEX)
 
 .PHONY:	clean
