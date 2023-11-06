@@ -110,54 +110,54 @@ avrdude -p t85 -v
 will show the programmer setup and device info for the ATtiny 85:
 
 ```
-avrdude: Version 7.1
-         Copyright the AVRDUDE authors;
-         see https://github.com/avrdudes/avrdude/blob/main/AUTHORS
+avrdude-git: Version 7.2-20231105 (ded89a66)
+             Copyright the AVRDUDE authors;
+             see https://github.com/avrdudes/avrdude/blob/main/AUTHORS
 
-         System wide configuration file is /etc/avrdude.conf
-         User configuration file is ~/.avrduderc
+             System wide configuration file is ~/projects/AVR/avrdude/build_linux/src/avrdude.conf
+             User configuration file is ~/.avrduderc
 
-         Using Port                    : /dev/ttyUSB0
-         Using Programmer              : stk500v1
-         AVR Part                      : ATtiny85
-         Chip Erase delay              : 4500 us
-         RESET disposition             : possible i/o
-         RETRY pulse                   : SCK
-         Serial program mode           : yes
-         Parallel program mode         : yes
-         Timeout                       : 200
-         StabDelay                     : 100
-         CmdexeDelay                   : 25
-         SyncLoops                     : 32
-         PollIndex                     : 3
-         PollValue                     : 0x53
-         Memory Detail                 :
+             Using Port                    : /dev/ttyUSB0
+             Using Programmer              : stk500v1
+             AVR Part                      : ATtiny85
+             Chip Erase delay              : 4500 us
+             RESET disposition             : possible i/o
+             RETRY pulse                   : SCK
+             Serial program mode           : yes
+             Parallel program mode         : yes
+             Timeout                       : 200
+             StabDelay                     : 100
+             CmdexeDelay                   : 25
+             SyncLoops                     : 32
+             PollIndex                     : 3
+             PollValue                     : 0x53
+             Memory Detail                 :
 
-                                           Block Poll               Page                       Polled
-           Memory Type Alias    Mode Delay Size  Indx Paged  Size   Size #Pages MinW  MaxW   ReadBack
-           ----------- -------- ---- ----- ----- ---- ------ ------ ---- ------ ----- ----- ---------
-           eeprom                 65     6     4    0 no        512    4      0  4000  4500 0xff 0xff
-           flash                  65     6    32    0 yes      8192   64    128  4500  4500 0xff 0xff
-           lfuse                   0     0     0    0 no          1    1      0  9000  9000 0x00 0x00
-           hfuse                   0     0     0    0 no          1    1      0  9000  9000 0x00 0x00
-           efuse                   0     0     0    0 no          1    1      0  9000  9000 0x00 0x00
-           lock                    0     0     0    0 no          1    1      0  9000  9000 0x00 0x00
-           signature               0     0     0    0 no          3    1      0     0     0 0x00 0x00
-           calibration             0     0     0    0 no          1    1      0     0     0 0x00 0x00
+                                               Block Poll               Page                       Polled
+               Memory Type Alias    Mode Delay Size  Indx Paged  Size   Size #Pages MinW  MaxW   ReadBack
+               ----------- -------- ---- ----- ----- ---- ------ ------ ---- ------ ----- ----- ---------
+               eeprom                 65     5     4    0 no        512    4      0  4000  4500 0x00 0x00
+               flash                  65    10    64    0 yes      8192   64    128  4500  4500 0x00 0x00
+               lfuse                   0     0     0    0 no          1    1      0  9000  9000 0x00 0x00
+               hfuse                   0     0     0    0 no          1    1      0  9000  9000 0x00 0x00
+               efuse                   0     0     0    0 no          1    1      0  9000  9000 0x00 0x00
+               lock                    0     0     0    0 no          1    1      0  9000  9000 0x00 0x00
+               signature               0     0     0    0 no          3    1      0     0     0 0x00 0x00
+               calibration             0     0     0    0 no          2    1      0     0     0 0x00 0x00
+               io                      0     0     0    0 no         64    1      0     0     0 0x00 0x00
 
-         Programmer Type : STK500
-         Description     : Atmel STK500 version 1.x firmware
-         Hardware Version: 2
-         Firmware Version: 1.25
-         Vtarget         : 4.8 V
-         Varef           : 0.0 V
-         Oscillator      : Off
-         SCK period      : 1.1 us
+             Programmer Type : STK500
+             Description     : Atmel STK500 version 1.x firmware
+             Hardware Version: 2
+             Firmware Version: 1.27
+             Vtarget         : 4.8 V
+             Varef           : 0.0 V
+             Oscillator      : 1000.000 kHz
+             SCK period      : 1.1 us
+avrdude-git: AVR device initialized and ready to accept instructions
+avrdude-git: device signature = 0x1e930b (probably t85)
 
-avrdude: AVR device initialized and ready to accept instructions
-avrdude: device signature = 0x1e930b (probably t85)
-
-avrdude done.  Thank you.
+avrdude-git done.  Thank you.
 
 ```
 
@@ -177,12 +177,14 @@ t85    | 8K / 512     |      1.91 s |       1.54 s |       0.90 s |        0.89 
 
 ### Programming Slow Targets
 
-When programming targets with a clock speed lower than 8 MHz the SPI can be slowed down from 1.3 MHz to 20 kHz,
-this allows to communicate with targets with a clock speed > 120 kHz. To slow down connect pin D2 with GND.
+When programming targets with a clock speed lower than 6 MHz the SPI can be slowed down from 1 MHz to 250 kHz,
+this allows to communicate with targets using the default setup (internal 8 MHz oscillator divided by 8).
+To slow down connect pin D2 with GND and press the reset button. You can also use the terminal command `sck 4`.
 
 ### Providing External Clock
 
-To program a target without own clock generation, e.g. a processor on an adapter board, an external 200 kHz clock (5 V) is provided on pin D3.
+To program a target without own clock generation, e.g. a processor on an adapter board, an external 1 MHz clock (5 V) is provided on pin D3.
+The clock frequncy can be changed with the terminal command `fosc`, e.g. `fosc 100k` sets 100 kHz.
 
 ## Programming Protocol
 
@@ -208,7 +210,7 @@ The firmware automatically recognises the modified `arduino` protocol by its use
          Programmer Type : Arduino
          Description     : Arduino for bootloader using STK500 v1 protocol
          Hardware Version: 2
-         Firmware Version: 1.25
+         Firmware Version: 1.27
 
 avrdude: AVR device initialized and ready to accept instructions
 avrdude: device signature = 0x1e930b (probably t85)

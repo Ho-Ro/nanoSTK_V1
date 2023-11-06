@@ -26,9 +26,9 @@
 // HW version 2
 #define HWVER       2
 
-// SW version 1.26
+// SW version 1.27
 #define SWMAJ       1
-#define SWMIN       26
+#define SWMIN       27
 
 
 // This software turns the Arduino Nano into an AVR ISP using the following Arduino pins:
@@ -58,34 +58,12 @@ const uint8_t RESET_ISP = 10;
 // this is the xtal of the nano
 #define NANO_XTAL  16000000UL
 
-// Configure SPI clock (in Hz).
-// E.g. for an ATtiny @ 128 kHz: the datasheet states that both the high and low
-// SPI clock pulse must be > 2 CPU cycles, so take 3 cycles i.e. divide target
-// f_cpu by 6:
-//     #define SPI_CLOCK            ( 128000UL / 6 )
-//
-
-// fast clock for devices with XTAL (min. 8 MHz)
-const uint32_t SPI_CLOCK_FAST = ( 8000000UL / 6 ); // 1.33 MHz
-// This gives a fast duration of 0.75 µs
-const uint8_t SCK_DURATION_FAST = 1;
-
-// clock slow enough for an ATtiny85 @ 128 kHz selectable with jumper
-const uint32_t SPI_CLOCK_SLOW = 20000; // ( 128000UL / 6 ) -> 21 kHz;
-// This gives a duration of 50 µs (* STK500_XTAL / 8 MHz -> 46)
-const uint8_t SCK_DURATION_SLOW = 46;
-
-
-// start with slow SPI as default, will be set later in setup()
-static uint32_t spi_clock = SPI_CLOCK_SLOW;
-static uint8_t sck_duration = SCK_DURATION_SLOW;
-
-
 // Configure which pins to use:
 
 // Optional nanoSTK HW changes:
 // Put an LED (with resistor) on the following pins:
 // 9: Heartbeat - Indicates that the programmer is running
+//
 // the next 4 LEDs are the same as used by ScratchMonkey
 // 8: Error     - An Error has occured - clear with programmer reset
 // 7: Write     - Writing to the target
@@ -116,8 +94,8 @@ const uint8_t LED_READ  = 6;
 // Programming mode LED
 const uint8_t LED_PMODE = 5;
 
-// 200 kHz output for targets that need an exteral clk
-#define EXT_CLK         200000UL
+// 1 MHz output for targets that need an exteral clk
+#define EXT_CLK         1000000UL
 #ifdef EXT_CLK
 const uint8_t EXT_CLK_OUT   = 3;
 #endif
@@ -146,6 +124,21 @@ const uint8_t SPI_SPEED_SELECT = 2;
 #define DETECT_ARDUINO_PROTOCOL
 
 
+// Configure SPI clock (in Hz)
+//
+// f_cpu < 12 MHz: SPI clock pulse low/high must be > 2 CPU cycles
+// f_cpu >= 12 MHz: SPI clock pulse low/high must be 3 CPU cycles
+// -> divide f_cpu by 6:
+//
+// fast clock for devices with XTAL (min. 6 MHz)
+// const uint32_t SPI_CLOCK_FAST = ( 6000000UL / 6 ); // 1 MHz
+// This gives a period of 1 µs
+
+
+// start with fast SPI as default, can be set later with term command "sck"
+static uint8_t sck_duration = 2; // 2 * 0.5 µs = 1 µs -> 1 MHz
+
+
 ////////////////////////////////////////////////////////////////////////////////
 
 
@@ -153,6 +146,11 @@ void setup() {
     Serial.begin( BAUDRATE );
 
     pinMode( SPI_SPEED_SELECT, INPUT_PULLUP );
+    if ( digitalRead( SPI_SPEED_SELECT ) )
+        sck_duration = 2;   // 1 MHz
+    else
+        sck_duration = 8;   // 250 kHz
+
     pinMode( LED_PMODE, OUTPUT );
     pulse( LED_PMODE, 2 );
     pinMode( LED_READ, OUTPUT );
@@ -161,13 +159,14 @@ void setup() {
     pulse( LED_WRITE, 2 );
     pinMode( LED_ERROR, OUTPUT );
     pulse( LED_ERROR, 2 );
+
 #ifdef HEARTBEAT
     pinMode(LED_HB, OUTPUT);
 #endif
+
 #ifdef EXT_CLK
     initTimer2();
 #endif
-    select_spi_speed();
 }
 
 
@@ -473,6 +472,12 @@ static void stk_set_parameter( uint8_t parm ) {
             empty_reply();
             break;
 #endif
+        case Parm_STK_SCK_DURATION:     // 0x89
+            sck_duration = get_byte();
+            if ( sck_duration > 8 )     // min SPI speed is 250 kHz
+                sck_duration = 8;
+            empty_reply();
+            break;
         default:
             get_byte();
             empty_reply();
@@ -508,7 +513,6 @@ static void stk_get_parameter( uint8_t parm ) {
             byte_reply( 0 );
             break;
         case Parm_STK_SCK_DURATION:     // 0x89
-            select_spi_speed();
             byte_reply( sck_duration );
             break;
         case Parm_STK_PROGMODE:         // 0x93
@@ -581,7 +585,7 @@ static void stk_enter_progmode() {
     reset_target( true );
     pinMode( RESET_ISP, OUTPUT );
     SPI.begin();
-    SPI.beginTransaction( SPISettings( spi_clock, MSBFIRST, SPI_MODE0 ) );
+    SPI.beginTransaction( SPISettings( (2000000UL / sck_duration), MSBFIRST, SPI_MODE0 ) );
 
     // See AVR datasheets, chapter "SERIAL_PRG Programming Algorithm":
 
@@ -978,18 +982,6 @@ static uint8_t get_V_target_10() {
     // Vcc = 3.3V * round( 1023 / v33 )
     uint16_t v33 = analogRead( A0 ); // about 700
     return ( 33 * 1023L + v33 / 2 ) / v33;
-}
-
-
-// check switch SPI_SPEED_SELECT - open: FAST, closed: SLOW
-static void select_spi_speed() {
-    if ( digitalRead( SPI_SPEED_SELECT ) ) {
-        spi_clock = SPI_CLOCK_FAST;
-        sck_duration = SCK_DURATION_FAST;
-    } else {
-        spi_clock = SPI_CLOCK_SLOW;
-        sck_duration = SCK_DURATION_SLOW;
-    }
 }
 
 
