@@ -11,6 +11,7 @@ PROJECT = nanoSTK_V1
 
 # The source code files
 INO = $(PROJECT)/$(PROJECT).ino
+SOURCE = $(PROJECT)/*.cpp
 HEADER = $(PROJECT)/*.h
 
 # The work space
@@ -26,7 +27,7 @@ HEX = $(PROJECT).hex
 .PHONY:	hex
 hex: $(HEX)
 
-$(INO.HEX): $(INO) $(HEADER) Makefile
+$(INO.HEX): $(INO) $(SOURCE) $(HEADER) Makefile
 	arduino --pref build.path=$(BUILD) --verify $(INO) --verbose
 
 $(HEX):	$(INO.HEX)
@@ -44,3 +45,6 @@ verify:
 clean:
 	rm -rf $(BUILD)
 
+.PHONY: format
+format:
+	clang-format -i $(INO) $(SOURCE)
