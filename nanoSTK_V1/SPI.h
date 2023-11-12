@@ -21,9 +21,9 @@
 
 class SPIclass {
   public:
-    void init( uint8_t sck_period = 1 );
+    void init( uint8_t sck_period = 0 );
     void exit( void );
-    uint8_t set_sck_duration( uint8_t sck_period = 1 );
+    uint8_t set_sck_duration( uint8_t sck_period = 0 );
     uint8_t get_sck_duration() { return sck_duration; };
     uint8_t transfer( uint8_t data );
 

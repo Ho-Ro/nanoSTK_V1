@@ -26,9 +26,9 @@
 // HW version 2
 #define HWVER 2
 
-// SW version 1.28
+// SW version 1.29
 #define SWMAJ 1
-#define SWMIN 28
+#define SWMIN 29
 
 
 // This software turns the Arduino Nano into an AVR ISP using the following Arduino pins:
@@ -133,12 +133,10 @@ const uint8_t SPI_SPEED_SELECT = 2;
 void setup() {
     Serial.begin( BAUDRATE );
 
-    SPI.init();
-
     // start with fast SPI as default, can be changed later with term command "sck"
     pinMode( SPI_SPEED_SELECT, INPUT_PULLUP );
     if ( digitalRead( SPI_SPEED_SELECT ) ) // pin open, default
-        SPI.init();                        // default = 0.5 µs clock period -> 2 MHz SPI speed, ok for target clock >=8 MHz
+        SPI.init( 1 );                     // default = 1 * 0.5 µs clock period -> 2 MHz SPI speed, ok for target clock >=8 MHz
     else                                   // pin closed, slow down
         SPI.init( 16 );                    // 16 * 0.5 µs = 8µs -> 125 kHz (target clock >= 500 kHz)
 
@@ -566,7 +564,7 @@ static void stk_enter_progmode() {
     // (reset_target() first sets the correct level)
     reset_target( true );
     pinMode( RESET_ISP, OUTPUT );
-    SPI.init();
+    SPI.init(); // HW init, do not change sck_duration
 
     // See AVR datasheets, chapter "SERIAL_PRG Programming Algorithm":
     // Pulse RESET_ISP after SCK_OUT_PIN is low:
