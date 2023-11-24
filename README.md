@@ -44,11 +44,15 @@ Put LEDs (with resistor) on the following pins:
 
 D5 .. D8 are identical to the [ScratchMonkey](https://github.com/microtherion/ScratchMonkey) status LEDs.
 
-## Firmware Installation
-
-### Linux
+## Firmware Development and Installation
 
 The source code was created and tested with the *Arduino* toolchain version 1.8.19 under Linux, *Debian stable*.
+Starting with version 1.31 the build process no longer depends on the *Arduino* toolchain.
+You only need the *avr-gcc* toolchain.
+
+The `Makefile` takes care of changes to the source code files and rebuilds the file
+`nanoSTK.hex` accordingly, using the *avr-gcc* toolchain - type `make`
+
 The installation process is simple and straightforward when using the `Makefile` from the command line:
 
 - Remove the *reset capacitor* from your *nanoSTK* HW.
@@ -56,18 +60,13 @@ The installation process is simple and straightforward when using the `Makefile`
 - Enter `make upload`
 - Re-install the *reset capacitor*.
 
-The upload of the file `nanoSTK_V1.hex` with `make upload` only requires the `avrdude` tool.
-If the source code remains unchanged, the *Arduino* tool chain is not required.
-
-#### Firmware Modifications
-
-The `Makefile` takes care of changes to the source code files in `nanoSTK_V1`
-and rebuilds the file `nanoSTK_V1.hex` accordingly, using the *Arduino* cli interface - type `make`
-or follow the description below in the next section.
+The upload of the file `nanoSTK.hex` with `make upload` only requires the `avrdude` tool.
+If the source code remains unchanged, the *avr-gcc* tool chain is not required.
 
 ### Other OS
 
 You can also use the Arduino tool chain, this should work on all supported operation systems.
+Check out the source and hex files (version 1.30) from the branch `arduino_toolchain`.
 
 - Remove the *reset capacitor* from your *nanoSTK* HW.
 - Connect the device to USB.
@@ -76,6 +75,9 @@ You can also use the Arduino tool chain, this should work on all supported opera
 - Select the correct serial port.
 - Execute `Sketch/Upload` from the menu.
 - Reinstall the *reset capacitor*.
+
+The upload of the file `nanoSTK_V1.hex` with `make upload` only requires the `avrdude` tool.
+If the source code remains unchanged, the *Arduino* tool chain is not required.
 
 ## Usage
 

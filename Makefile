@@ -1,50 +1,81 @@
-# Build the *.hex file from the *.ino using arduino cli command
-#
-# Makefile targets:
-# make hex	- build the programmer hexfile
-# make flash	- upload the hex file to the nano flash (and verify automatically)
-# make verify	- compare the hex file and the nano flash content
-# make clean	- remove all intermediate build artifacts (keep the final *.hex file)
+# Name: Makefile
+# Project: Simple ATtiny85 project
+# Tabsize: 4
 
-# The project
-PROJECT = nanoSTK_V1
 
-# The source code files
-INO = $(PROJECT)/$(PROJECT).ino
-SOURCE = $(PROJECT)/*.cpp
-HEADER = $(PROJECT)/*.h
+######################################
+# Nothing to change below (normally) #
+######################################
 
-# The work space
-BUILD = build
+PROJECT = nanoSTK
 
-# The firmware (in work space)
-INO.HEX = $(BUILD)/$(PROJECT).ino.hex
+F_CPU = 16000000
 
-# The final firmware - ready to install
-HEX = $(PROJECT).hex
+DEVICE = atmega328p
 
-# This is the default target of the Makefile
-.PHONY:	hex
-hex: $(HEX)
+AVRDUDE = avrdude
 
-$(INO.HEX): $(INO) $(SOURCE) $(HEADER) Makefile
-	arduino --pref build.path=$(BUILD) --verify $(INO) --verbose
+COMPILE = avr-gcc -std=c++11 -g -Wall -Wextra -Os -I. -mmcu=$(DEVICE) -DF_CPU=$(F_CPU)
 
-$(HEX):	$(INO.HEX)
-	@cp $< $@
+SOURCES = $(PROJECT).cpp delay.cpp io.cpp spi.cpp uart.cpp
 
-.PHONY:	upload
-upload:
-	avrdude -p m328p -c arduino -U flash:w:$(HEX)
+OBJECTS = $(PROJECT).o delay.o io.o spi.o uart.o
 
-.PHONY:	verify
-verify:
-	avrdude -p m328p -c arduino -U flash:v:$(HEX)
+# files that contain config information
+DEPENDS = delay.h io.h spi.h uart.h AVR061_command.h AVR910_ISP.h Makefile
 
-.PHONY:	clean
+
+####################
+# symbolic targets #
+####################
+
+all:	$(PROJECT).hex
+
+lst:	$(PROJECT).lst
+
+.PHONY: upload
+upload: all
+	$(AVRDUDE) -p$(DEVICE) -c arduino -U flash:w:$(PROJECT).hex:i
+
+.PHONY: verify
+verify: all
+	$(AVRDUDE) -p$(DEVICE) -c arduino -U flash:v:$(PROJECT).hex:i
+
+.PHONY: clean
 clean:
-	rm -rf $(BUILD)
+	rm -f $(PROJECT).hex $(PROJECT).lst $(PROJECT).obj $(PROJECT).cof
+	rm -f $(PROJECT).lss $(PROJECT).map $(PROJECT).eep.hex $(PROJECT).elf
+	rm -f *.o *~ *.bak $(PROJECT).s
 
-.PHONY: format
-format:
-	clang-format -i $(INO) $(SOURCE)
+
+################
+# file targets #
+################
+
+$(PROJECT).o:	$(PROJECT).cpp $(DEPENDS)
+	$(COMPILE) -c $< -o $@
+
+delay.o:delay.cpp $(DEPENDS)
+	$(COMPILE) -c $< -o $@
+
+io.o:	io.cpp $(DEPENDS)
+	$(COMPILE) -c $< -o $@
+
+spi.o:	spi.cpp $(DEPENDS)
+	$(COMPILE) -c $< -o $@
+
+uart.o:	uart.cpp $(DEPENDS)
+	$(COMPILE) -c $< -o $@
+
+$(PROJECT).elf:	$(OBJECTS)
+	$(COMPILE) -o $@ $^
+
+$(PROJECT).hex:	$(PROJECT).elf
+	@rm -f $@ $(PROJECT).eep.hex
+	avr-objcopy -j .text -j .data -O ihex $< $@
+	@#avr-objdump -d $< > $(PROJECT).lss
+	avr-size $<
+
+$(PROJECT).lst:	$(PROJECT).elf
+	avr-objdump -h -S $< > $@
+

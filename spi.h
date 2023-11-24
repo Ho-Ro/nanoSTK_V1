@@ -6,7 +6,6 @@
 
 #pragma once
 
-
 // defines for low level SPI bit bang
 #define DDR_MOSI DDRB
 #define PORT_MOSI PORTB

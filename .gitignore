@@ -4,4 +4,11 @@
 *.orig
 *.pdf
 *.log
+
 build
+*.elf
+*.lst
+*.lss
+*.map
+*.o
+

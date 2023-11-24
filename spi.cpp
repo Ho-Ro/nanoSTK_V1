@@ -4,9 +4,13 @@
 // it provides fast HW SPI and slow bit banging SPI depending on sck_duration
 
 
-#include <Arduino.h>
+#include <avr/io.h>
+#include <util/delay.h>
 
-#include "SPI.h"
+#include "delay.h"
+#include "spi.h"
+#include "io.h"
+
 
 
 void SPIclass::init( uint8_t sck_period ) {
@@ -96,9 +100,9 @@ uint8_t SPIclass::transfer( uint8_t data ) {
                 PORT_MOSI |= ( 1 << BIT_MOSI ); // digitalWrite( MOSI_OUT_PIN, HIGH );
             else
                 PORT_MOSI &= ~( 1 << BIT_MOSI ); // digitalWrite( MOSI_OUT_PIN, LOW );
-            delayMicroseconds( sck_duration / 2 );
+            delay_us( sck_duration / 2 );
             PORT_SCK |= ( 1 << BIT_SCK ); // digitalWrite( SCK_OUT_PIN, HIGH );
-            delayMicroseconds( sck_duration / 2 );
+            delay_us( sck_duration / 2 );
             PORT_SCK &= ~( 1 << BIT_SCK ); // digitalWrite( SCK_OUT_PIN, LOW );
             data <<= 1;
         }
