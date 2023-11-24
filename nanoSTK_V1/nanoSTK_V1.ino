@@ -26,9 +26,9 @@
 // HW version 2
 #define HWVER 2
 
-// SW version 1.29
+// SW version 1.30
 #define SWMAJ 1
-#define SWMIN 29
+#define SWMIN 30
 
 
 // This software turns the Arduino Nano into an AVR ISP using the following Arduino pins:
@@ -98,8 +98,8 @@ const uint8_t LED_READ = 6;
 // Programming mode LED
 const uint8_t LED_PMODE = 5;
 
-// 1 MHz output for targets that need an exteral clk
-#define EXT_CLK 1000000UL
+// 8 or 1 MHz output for targets that need an exteral clk
+#define EXT_CLK
 #ifdef EXT_CLK
 const uint8_t EXT_CLK_OUT = 3;
 #endif
@@ -135,11 +135,17 @@ void setup() {
 
     // start with fast SPI as default, can be changed later with term command "sck"
     pinMode( SPI_SPEED_SELECT, INPUT_PULLUP );
-    if ( digitalRead( SPI_SPEED_SELECT ) ) // pin open, default
-        SPI.init( 1 );                     // default = 1 * 0.5 µs clock period -> 2 MHz SPI speed, ok for target clock >=8 MHz
-    else                                   // pin closed, slow down
-        SPI.init( 16 );                    // 16 * 0.5 µs = 8µs -> 125 kHz (target clock >= 500 kHz)
-
+    if ( digitalRead( SPI_SPEED_SELECT ) ) { // pin open, default
+        SPI.init( 2 );                       // default = 2 * 0.5 µs clock period -> 1 MHz SPI speed, ok for target clock >=4 MHz
+#ifdef EXT_CLK
+        initTimer2( 1, 0 ); // pscale = 1, cmatch = 0 -> 8 MHz
+#endif
+    } else {                                 // pin closed, slow down
+        SPI.init( 16 );                      // 16 * 0.5 µs = 8µs -> 125 kHz (target clock >= 500 kHz)
+#ifdef EXT_CLK
+        initTimer2( 1, 7 ); // pscale = 1, cmatch = 7 -> 1 MHz
+#endif
+    }
     pinMode( LED_PMODE, OUTPUT );
     pulse( LED_PMODE, 2 );
     pinMode( LED_READ, OUTPUT );
@@ -153,9 +159,6 @@ void setup() {
     pinMode( LED_HB, OUTPUT );
 #endif
 
-#ifdef EXT_CLK
-    initTimer2();
-#endif
 }
 
 
@@ -935,6 +938,7 @@ static void hack_eeprom_delay() {
     }
 }
 
+
 #ifdef VTARGET
 
 // measure the 3V3 voltage and calculate Vcc, return 10 * Vcc
@@ -947,22 +951,22 @@ static uint8_t get_V_target_10() {
 
 #endif
 
+
 #ifdef EXT_CLK
 
 //--------------------------------------------------------------------------------
 // configTimer2
-// output 1 MHz rectangle at D3 as clock signal for devices with external clock
+// output rectangle at D3 as clock signal for devices with external clock
 //--------------------------------------------------------------------------------
-static void initTimer2() {
+static void initTimer2( uint8_t pscale, uint8_t cmatch ) {
     // Set OC2B for Compare Match (digital pin3)
     pinMode( EXT_CLK_OUT, OUTPUT );
 
     // Initialize Timer2
     TCCR2A = ( 1 << WGM21 ) | ( 1 << COM2B0 );          // CTC (MODE_2) + Toggle OC2B
-    TCCR2B = 1;                                         // prescaler = 1
-    OCR2A = uint8_t( ( NANO_XTAL / 2 / EXT_CLK ) - 1 ); // 7 -> 1 MHz
+    TCCR2B = pscale;                                    // default: prescaler = 1
+    OCR2A = cmatch;                                     // default: 0 -> 8 MHz
     TCNT2 = 0;                                          // Reset Timer2 Counter
 }
-
 
 #endif

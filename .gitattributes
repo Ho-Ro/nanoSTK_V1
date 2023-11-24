@@ -1,2 +1,2 @@
 # do not convert LF <-> CRLF
-*.hex binary
+*.hex text eol=crlf
