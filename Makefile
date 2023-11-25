@@ -1,5 +1,5 @@
 # Name: Makefile
-# Project: Simple ATtiny85 project
+# Project: NanoSTK - The fastest AVR ISP interface using STK500 v1 protocol
 # Tabsize: 4
 
 
@@ -22,7 +22,7 @@ SOURCES = $(PROJECT).cpp delay.cpp io.cpp spi.cpp uart.cpp
 OBJECTS = $(PROJECT).o delay.o io.o spi.o uart.o
 
 # files that contain config information
-DEPENDS = delay.h io.h spi.h uart.h AVR061_command.h AVR910_ISP.h Makefile
+DEPENDS = nanoSTK.h delay.h io.h spi.h uart.h AVR061_command.h AVR910_ISP.h Makefile
 
 
 ####################

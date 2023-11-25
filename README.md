@@ -47,7 +47,7 @@ D5 .. D8 are identical to the [ScratchMonkey](https://github.com/microtherion/Sc
 ## Firmware Development and Installation
 
 The source code was created and tested with the *Arduino* toolchain version 1.8.19 under Linux, *Debian stable*.
-Starting with version 1.31 the build process no longer depends on the *Arduino* toolchain.
+Starting with version 1.50 the build process no longer depends on the *Arduino* toolchain.
 You only need the *avr-gcc* toolchain.
 
 The `Makefile` takes care of changes to the source code files and rebuilds the file
@@ -60,6 +60,8 @@ The installation process is simple and straightforward when using the `Makefile`
 - Enter `make upload`
 - Re-install the *reset capacitor*.
 
+Instead of removing/inserting the *reset capacitor* you can also press the reset button
+as soon as the `avrdude` command is started.
 The upload of the file `nanoSTK.hex` with `make upload` only requires the `avrdude` tool.
 If the source code remains unchanged, the *avr-gcc* tool chain is not required.
 
@@ -78,6 +80,7 @@ Check out the source and hex files (version 1.30) from the branch `arduino_toolc
 
 The upload of the file `nanoSTK_V1.hex` with `make upload` only requires the `avrdude` tool.
 If the source code remains unchanged, the *Arduino* tool chain is not required.
+This branch `arduino_toolchain` will not be developed further, only bugfixes will be applied.
 
 ## Usage
 

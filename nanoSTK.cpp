@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // nanoSTK_v1
-// using arduino nano as ISP with STK500 v1 protocol
+// using arduino nano as fastest ISP with STK500 v1 protocol
+//
 // program based on:
 
 //
@@ -10,6 +11,15 @@
 // If you require a license, see
 // http://www.opensource.org/licenses/bsd-license.php
 //
+
+
+// HW version 2
+#define HWVER 2
+
+// SW version 1.50
+#define SWMAJ 1
+#define SWMIN 50
+
 
 #include <stdint.h>
 #include <util/delay.h>
@@ -31,12 +41,8 @@
 // low level UART implementation
 #include "uart.h"
 
-// HW version 2
-#define HWVER 2
-
-// SW version 1.31
-#define SWMAJ 1
-#define SWMIN 31
+//
+#include "nanoSTK.h"
 
 
 // Starting with SW version 1.31 this programmer does no longer depend on Arduino.
@@ -58,14 +64,13 @@
 
 const uint8_t RESET_ISP = 10; // /SS (PB2)
 
-// Configure the baud rate - BAUDRATE > 115200 does not work!
-#define BAUDRATE 115200UL
-
-
-// this is the original xtal of STK500
-#define STK500_XTAL 7372800UL
-// this is the xtal of the nano
-#define NANO_XTAL 16000000UL
+// Configure the baud rate
+// 115200 is the avrdude default value
+#define BITRATE 115200UL
+// BAUDRATE 230400 does not work!
+// Use one of the next two for faster speed:
+// #define BITRATE 500000UL
+// #define BITRATE 1000000UL
 
 // Configure which pins to use:
 
@@ -89,28 +94,28 @@ const uint8_t RESET_ISP = 10; // /SS (PB2)
 // A0:          - measure 3.3 V with AREF=Vcc, calculate Vcc and show as VTARGET.
 #define VTARGET
 
-// #define HEARTBEAT
+#define HEARTBEAT
 #ifdef HEARTBEAT
 // Heartbeat LED
-const uint8_t LED_HB = 9;       // PB1
+const uint8_t LED_HB = 9; // PB1
 #endif
 
 // Error LED
-const uint8_t LED_ERROR = 8;    // PB0
+const uint8_t LED_ERROR = 8; // PB0
 
 // Writing activity LED
-const uint8_t LED_WRITE = 7;    // PD7
+const uint8_t LED_WRITE = 7; // PD7
 
 // Reading activity LED
-const uint8_t LED_READ = 6;     // PD6
+const uint8_t LED_READ = 6; // PD6
 
 // Programming mode LED
-const uint8_t LED_PMODE = 5;    // PD5
+const uint8_t LED_PMODE = 5; // PD5
 
 // 8 or 1 MHz output for targets that need an exteral clk
 #define EXT_CLK
 #ifdef EXT_CLK
-const uint8_t EXT_CLK_OUT = 3;  // PD3
+const uint8_t EXT_CLK_OUT = 3; // PD3
 #endif
 
 // switch: open = FAST SPI mode, closed = SLOW SPI mode
@@ -126,49 +131,6 @@ const uint8_t SPI_SPEED_SELECT = 2;
 // To enable the automatic detection of the "arduino" protocol uncomment the next line.
 #define DETECT_ARDUINO_PROTOCOL
 
-// the funtion prototypes
-//
-void setup();
-static uint16_t buff_get_16( uint16_t addr );
-static uint32_t buff_get_32( uint16_t addr );
-void loop( void );
-static void avrisp();
-static void stk_set_parameter( uint8_t parm );
-static void stk_get_parameter( uint8_t parm );
-static void stk_set_device();
-static void stk_set_device_ext();
-static void stk_enter_progmode();
-static void stk_leave_progmode();
-static void stk_universal();
-static void stk_prog_data();
-static void stk_prog_page();
-static void stk_read_page();
-static void stk_read_sign();
-static void write_flash( uint16_t length );
-static uint8_t write_flash_pages( uint16_t length );
-static void load_flash_page( uint8_t hilo, uint16_t addr, uint8_t data );
-static void write_flash_page( uint16_t addr );
-static uint16_t current_page();
-static uint8_t write_eeprom( uint16_t length );
-static void load_eeprom_page( uint16_t addr, uint8_t data );
-static void write_eeprom_page( uint16_t addr );
-static uint8_t read_flash_page( uint16_t length );
-static uint8_t read_flash_byte( uint8_t hilo, uint16_t addr );
-static uint8_t read_eeprom_page( uint16_t length );
-static uint8_t read_eeprom_byte( uint16_t addr );
-static void start_isp_delay( uint8_t delay );
-static uint8_t spi_transaction( uint8_t a, uint8_t b, uint8_t c, uint8_t d );
-static void reset_target( bool reset );
-static uint8_t get_byte();
-static uint16_t get_word_LH();
-static uint16_t get_word_HL();
-static void fill( uint16_t n );
-static void empty_reply();
-static void byte_reply( uint8_t b );
-static void hack_eeprom_delay();
-static uint8_t get_V_target_10();
-static void initTimer2( uint8_t pscale, uint8_t cmatch );
-
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -181,12 +143,12 @@ int main( void ) {
 
     setup();
 
-    for(;;) {
+    for ( ;; ) {
         // is there an error?
         if ( ISPError ) {
-            digiWrite( LED_ERROR, 1 );
+            digitalWrite( LED_ERROR, 1 );
         } else {
-            digiWrite( LED_ERROR, 0 );
+            digitalWrite( LED_ERROR, 0 );
         }
 
 #ifdef HEARTBEAT
@@ -198,7 +160,6 @@ int main( void ) {
             avrisp(); // process STK command
         }
     }
-
 }
 
 
@@ -206,35 +167,33 @@ int main( void ) {
 
 
 void setup() {
-    init_millis();          // init the timekeeping
-    UART.begin( BAUDRATE ); // init serial communication - enables interrrupts with sei()
+    init_millis();         // init the timekeeping
+    UART.begin( BITRATE ); // init serial communication - enables interrrupts with sei()
 
     // start with fast SPI as default, can be changed later with term command "sck"
-    DDRD &= ~(1<<2); // pinMode( SPI_SPEED_SELECT, INPUT );
-    PORTD |= (1<<2); // pinMode( SPI_SPEED_SELECT, INPUT_PULLUP );
-    //_delay_ms( 20 );
-    if ( digiRead( SPI_SPEED_SELECT ) ) {   // pin open, default
-        SPI.init( 2 );                      // default = 2 * 0.5 µs clock period -> 1 MHz SPI speed, ok for target clock >=4 MHz
+    pinModeInputPullup( SPI_SPEED_SELECT );
+    if ( digitalRead( SPI_SPEED_SELECT ) ) { // pin open, default = 2 * 0.5 µs clock period
+        SPI.init( 2 );                       // 1 MHz SPI speed, ok for target clock >=4 MHz
 #ifdef EXT_CLK
         initTimer2( 1, 0 ); // pscale = 1, cmatch = 0 -> 8 MHz
 #endif
-    } else {                                // pin closed, slow down
-        SPI.init( 16 );                     // 16 * 0.5 µs = 8µs -> 125 kHz (target clock >= 500 kHz)
+    } else {            // pin closed, slow down
+        SPI.init( 16 ); // 16 * 0.5 µs = 8µs -> 125 kHz (target clock >= 500 kHz)
 #ifdef EXT_CLK
         initTimer2( 1, 7 ); // pscale = 1, cmatch = 7 -> 1 MHz
 #endif
     }
-    DDRD |= 1 << 5; // pinMode( LED_PMODE, OUTPUT );
+    pinModeOutput( LED_PMODE );
     pulse( LED_PMODE, 2 );
-    DDRD |= 1 << 6; // pinMode( LED_READ, OUTPUT );
+    pinModeOutput( LED_READ );
     pulse( LED_READ, 2 );
-    DDRD |= 1 << 7; // pinMode( LED_WRITE, OUTPUT );
+    pinModeOutput( LED_WRITE );
     pulse( LED_WRITE, 2 );
-    DDRB |= 1 << 0; // pinMode( LED_ERROR, OUTPUT );
+    pinModeOutput( LED_ERROR );
     pulse( LED_ERROR, 2 );
 
 #ifdef HEARTBEAT
-    DDRB |= 1 << 1; // pinMode( LED_HB, OUTPUT );
+    pwm_init();
 #endif
 
 #ifdef VTARGET
@@ -260,8 +219,8 @@ static uint8_t sig[ SIG_SIZE ];
 
 // default wait delay before writing next EEPROM location
 // can be adapted according to device signature
-#define WAIT_DELAY_EEPROM_FAST      4
-#define WAIT_DELAY_EEPROM_DEFAULT   10
+#define WAIT_DELAY_EEPROM_FAST 4
+#define WAIT_DELAY_EEPROM_DEFAULT 10
 
 static int16_t wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;
 
@@ -297,21 +256,20 @@ static param_t param;
 #ifdef HEARTBEAT
 // this provides a heartbeat on pin 9, so you can see the software is running.
 static void heartbeat() {
-    static int8_t hbdelta = 8;
-    static uint8_t hbval = 128;
+    static int8_t updown = 5;
+    static int8_t percent = 0;
     static uint32_t last_time = 0;
     uint32_t now = millis();
-    if ( ( now - last_time ) < 40 ) {
+    if ( ( now - last_time ) < 50 ) {
         return;
     }
     last_time = now;
-    if ( hbval > 160 ) {
-        hbdelta = -hbdelta;
-    } else if ( hbval < 16 ) {
-        hbdelta = -hbdelta;
-    }
-    hbval += hbdelta;
-    analogWrite( LED_HB, hbval );
+    pwm_out( percent );
+    if ( percent >= 100 )
+        updown = -5;
+    else if ( percent <= 0 )
+        updown = 5;
+    percent += updown;
 }
 #endif
 
@@ -435,9 +393,9 @@ static void avrisp() {
     // Program one byte in EEPROM memory.
     // Cmnd_STK_PROG_DATA, data, Sync_CRC_EOP
     case Cmnd_STK_PROG_DATA: // 0x61 'a'
-        digiWrite( LED_WRITE, 1 );
+        digitalWrite( LED_WRITE, 1 );
         stk_prog_data();
-        digiWrite( LED_WRITE, 0 );
+        digitalWrite( LED_WRITE, 0 );
         break;
 
     // Download a block of data to the programmer and program it
@@ -445,27 +403,27 @@ static void avrisp() {
     // The data block size should not be larger than 256 bytes.
     // Cmnd_STK_PROG_PAGE, bytes_high, bytes_low, memtype, data, Sync_CRC_EOP
     case Cmnd_STK_PROG_PAGE: // 0x64 'd'
-        digiWrite( LED_WRITE, 1 );
+        digitalWrite( LED_WRITE, 1 );
         stk_prog_page();
-        digiWrite( LED_WRITE, 0 );
+        digitalWrite( LED_WRITE, 0 );
         break;
 
     // Read a block of data from FLASH or EEPROM of the current device.
     // The data block size should not be larger than 256 bytes.
     // Cmnd_STK_READ_PAGE, bytes_high, bytes_low, memtype, Sync_CRC_EOP
     case Cmnd_STK_READ_PAGE: // 0x74 't'
-        digiWrite( LED_READ, 1 );
+        digitalWrite( LED_READ, 1 );
         stk_read_page();
-        digiWrite( LED_READ, 0 );
+        digitalWrite( LED_READ, 0 );
         break;
 
     // Read the three signature bytes.
     // Used by arduino protocol, not used by stk500v1 protocol.
     // Cmnd_STK_READ_SIGN, Sync_CRC_EOP
     case Cmnd_STK_READ_SIGN: // 0x75 'u'
-        digiWrite( LED_READ, 1 );
+        digitalWrite( LED_READ, 1 );
         stk_read_sign();
-        digiWrite( LED_READ, 0 );
+        digitalWrite( LED_READ, 0 );
         break;
 
     // expecting a command, not Sync_CRC_EOP
@@ -616,11 +574,11 @@ static void stk_enter_progmode() {
     // (reset_target() first sets the correct level)
     reset_target( true );
     DDRB |= 1 << 2; // pinMode( RESET_ISP, OUTPUT );
-    SPI.init(); // HW init, do not change sck_duration
+    SPI.init();     // HW init, do not change sck_duration
 
     // See AVR datasheets, chapter "SERIAL_PRG Programming Algorithm":
     // Pulse RESET_ISP after SCK_OUT_PIN is low:
-    digiWrite( SCK_OUT_PIN, 0 );
+    digitalWrite( SCK_OUT_PIN, 0 );
     _delay_ms( 20 ); // discharge SCK_OUT_PIN, value arbitrarily chosen
     reset_target( false );
     // Pulse must be minimum 2 target CPU clock cycles so 100 usec is ok for CPU
@@ -631,7 +589,7 @@ static void stk_enter_progmode() {
     // Send the enable programming command: 0xAC, 0x53, 0x00, 0x00
     _delay_ms( 50 ); // datasheet: must be > 20 msec
     spi_transaction( ISP_ENTER_PMODE_BYTE_0, ISP_ENTER_PMODE_BYTE_1, 0, 0 );
-    digiWrite( LED_PMODE, 1 );
+    digitalWrite( LED_PMODE, 1 );
     pmode = true;
 }
 
@@ -642,7 +600,7 @@ static void stk_leave_progmode() {
     SPI.exit();
     reset_target( false );
     DDRB |= 1 << 2; // pinMode( RESET_ISP, INPUT );
-    digiWrite( LED_PMODE, 0 );
+    digitalWrite( LED_PMODE, 0 );
     pmode = false;
     use_arduino_protocol = false; // switch back to default stk500v1 protocol
     for ( uint8_t iii = 0; iii < SIG_SIZE; ++iii )
@@ -899,8 +857,8 @@ static void start_isp_delay( uint8_t delay ) { milli_target = millis() + delay; 
 // values according data sheet section "Serial Programming Instruction Set"
 static uint8_t spi_transaction( uint8_t a, uint8_t b, uint8_t c, uint8_t d ) {
     uint32_t wait = milli_target - millis();
-    if ( wait < 30 ) // delay not yet finished
-        delay_us( 1000 * int(wait) ); // wait before next SPI transfer
+    if ( wait < 30 )                    // delay not yet finished
+        delay_us( 1000 * int( wait ) ); // wait before next SPI transfer
     SPI.transfer( a );
     SPI.transfer( b );
     SPI.transfer( c );
@@ -909,7 +867,7 @@ static uint8_t spi_transaction( uint8_t a, uint8_t b, uint8_t c, uint8_t d ) {
 
 
 static void reset_target( bool reset ) {
-    digiWrite( RESET_ISP, ( ( reset && rst_active_high ) || ( !reset && !rst_active_high ) ) ? 1 : 0 );
+    digitalWrite( RESET_ISP, ( ( reset && rst_active_high ) || ( !reset && !rst_active_high ) ) ? 1 : 0 );
 }
 
 
@@ -1012,10 +970,10 @@ static void initTimer2( uint8_t pscale, uint8_t cmatch ) {
     DDRD |= 1 << 3; // pinMode( EXT_CLK_OUT, OUTPUT );
 
     // Initialize Timer2
-    TCCR2A = ( 1 << WGM21 ) | ( 1 << COM2B0 );          // CTC (MODE_2) + Toggle OC2B
-    TCCR2B = pscale;                                    // default: prescaler = 1
-    OCR2A = cmatch;                                     // default: 0 -> 8 MHz
-    TCNT2 = 0;                                          // Reset Timer2 Counter
+    TCCR2A = ( 1 << WGM21 ) | ( 1 << COM2B0 ); // CTC (MODE_2) + Toggle OC2B
+    TCCR2B = pscale;                           // default: prescaler = 1
+    OCR2A = cmatch;                            // default: 0 -> 8 MHz
+    TCNT2 = 0;                                 // Reset Timer2 Counter
 }
 
 #endif

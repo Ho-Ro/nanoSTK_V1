@@ -8,9 +8,8 @@
 #include <util/delay.h>
 
 #include "delay.h"
-#include "spi.h"
 #include "io.h"
-
+#include "spi.h"
 
 
 void SPIclass::init( uint8_t sck_period ) {
@@ -52,8 +51,9 @@ void SPIclass::exit( void ) {
 
 uint8_t SPIclass::set_sck_duration( uint8_t sck_period ) {
     if ( !sck_period ) // 0: do not change sck_duration
-        return sck_duration;
-    sck_duration = sck_period;
+        sck_period = sck_duration;
+    else
+        sck_duration = sck_period;
     if ( sck_period > 16 ) {       // use bit banging
         SPCR = 0;                  // disable HW SPI
     } else if ( sck_period > 8 ) { // 16 MHz / 128 = 125 kHz -> 8 µs
