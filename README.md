@@ -3,13 +3,14 @@
 ## Using Arduino Nano as AVR ISP with STK500 v1 protocol
 
 This project enables the use of an Arduino Nano board with minor modifications (nanoSTK)
-as an in-system programmer (ISP) for AVR devices like ATtiny and ATmega
+as the fastest in-system programmer (ISP) for classic AVR devices such as ATtiny and ATmega
 together with a programming software, e.g. [AVRDUDE](https://github.com/avrdudes/avrdude/).
 
 The program is based on:
 [ArduinoISP](https://github.com/rsbohn/ArduinoISP) - Copyright (c) 2008-2011 Randall Bohn
 
 ## Programmer Hardware
+
 The programming process uses VCC, GND and four data pins.
 By default, the hardware SPI pins MISO, MOSI and SCK are used to communicate with the target.
 The fourth pin (D10) from the programming microprocessor goes to the reset pin of the target.
@@ -46,14 +47,15 @@ D5 .. D8 are identical to the [ScratchMonkey](https://github.com/microtherion/Sc
 
 ## Firmware Development and Installation
 
-The source code was created and tested with the *Arduino* toolchain version 1.8.19 under Linux, *Debian stable*.
-Starting with version 1.50 the build process no longer depends on the *Arduino* toolchain.
+The source code was originally created and tested with the *Arduino* toolchain
+version 1.8.19 under Linux, *Debian stable*.
+As of version 1.50, the build process is no longer dependent on the *Arduino* toolchain.
 You only need the *avr-gcc* toolchain.
 
 The `Makefile` takes care of changes to the source code files and rebuilds the file
-`nanoSTK.hex` accordingly, using the *avr-gcc* toolchain - type `make`
+`nanoSTK.hex` accordingly - just type `make`
 
-The installation process is simple and straightforward when using the `Makefile` from the command line:
+The installation process is simple and straightforward from the command line:
 
 - Remove the *reset capacitor* from your *nanoSTK* HW.
 - Connect the device to USB.
@@ -68,7 +70,8 @@ If the source code remains unchanged, the *avr-gcc* tool chain is not required.
 ### Other OS
 
 You can also use the Arduino tool chain, this should work on all supported operation systems.
-Check out the source and hex files (version 1.30) from the branch `arduino_toolchain`.
+Check out the source and hex files from the branch
+[`arduino_toolchain`](https://github.com/Ho-Ro/nanoSTK_V1/tree/arduino_toolchain).
 
 - Remove the *reset capacitor* from your *nanoSTK* HW.
 - Connect the device to USB.
@@ -80,7 +83,8 @@ Check out the source and hex files (version 1.30) from the branch `arduino_toolc
 
 The upload of the file `nanoSTK_V1.hex` with `make upload` only requires the `avrdude` tool.
 If the source code remains unchanged, the *Arduino* tool chain is not required.
-This branch `arduino_toolchain` will not be developed further, only bugfixes will be applied.
+The branch `arduino_toolchain` will not be developed regularly
+and will not receive any new features, only critical bugs will be fixed.
 
 ## Usage
 
@@ -93,7 +97,24 @@ Put this file into your home directory (Linux) to set the nanoSTK device as the 
 ```
 # file ~/.avrduderc
 
-default_programmer  = "stk500v1";
+#------------------------------------------------------------
+# nanoSTK
+#------------------------------------------------------------
+
+# this is the same as `-c stk500v1`
+# but has different features
+# warning: "extra_features" is not supported for avrdude version < 7.2
+
+programmer # nanoSTK
+    id                     = "nanoSTK";
+    desc                   = "nanoSTK - arduino nano programmer using stk500v1 protocol";
+    type                   = "stk500";
+    prog_modes             = PM_ISP;
+#    extra_features         = HAS_VTARG_READ | HAS_FOSC_ADJ;
+    connection_type        = serial;
+;
+
+default_programmer  = "nanoSTK";
 
 default_serial = "/dev/ttyUSB0";
 ```
@@ -115,50 +136,27 @@ avrdude -p t85 -v
 will show the programmer setup and device info for the ATtiny 85:
 
 ```
-avrdude-git: Version 7.2-20231105 (ded89a66)
+$ avrdude-git -pt85 -v
+
+avrdude-git: Version 7.2-20231122 (606658a1)
              Copyright the AVRDUDE authors;
              see https://github.com/avrdudes/avrdude/blob/main/AUTHORS
 
-             System wide configuration file is ~/projects/AVR/avrdude/build_linux/src/avrdude.conf
-             User configuration file is ~/.avrduderc
+             System wide configuration file is /home/horo/projects/AVR/avrdude/build_linux/src/avrdude.conf
+             User configuration file is /home/horo/.avrduderc
 
-             Using Port                    : /dev/ttyUSB0
-             Using Programmer              : stk500v1
-             AVR Part                      : ATtiny85
-             Chip Erase delay              : 4500 us
-             RESET disposition             : possible i/o
-             RETRY pulse                   : SCK
-             Serial program mode           : yes
-             Parallel program mode         : yes
-             Timeout                       : 200
-             StabDelay                     : 100
-             CmdexeDelay                   : 25
-             SyncLoops                     : 32
-             PollIndex                     : 3
-             PollValue                     : 0x53
-             Memory Detail                 :
-
-                                               Block Poll               Page                       Polled
-               Memory Type Alias    Mode Delay Size  Indx Paged  Size   Size #Pages MinW  MaxW   ReadBack
-               ----------- -------- ---- ----- ----- ---- ------ ------ ---- ------ ----- ----- ---------
-               eeprom                 65     5     4    0 no        512    4      0  4000  4500 0x00 0x00
-               flash                  65    10    64    0 yes      8192   64    128  4500  4500 0x00 0x00
-               lfuse                   0     0     0    0 no          1    1      0  9000  9000 0x00 0x00
-               hfuse                   0     0     0    0 no          1    1      0  9000  9000 0x00 0x00
-               efuse                   0     0     0    0 no          1    1      0  9000  9000 0x00 0x00
-               lock                    0     0     0    0 no          1    1      0  9000  9000 0x00 0x00
-               signature               0     0     0    0 no          3    1      0     0     0 0x00 0x00
-               calibration             0     0     0    0 no          2    1      0     0     0 0x00 0x00
-               io                      0     0     0    0 no         64    1      0     0     0 0x00 0x00
-
-             Programmer Type : STK500
-             Description     : Atmel STK500 version 1.x firmware
-             Hardware Version: 2
-             Firmware Version: 1.27
-             Vtarget         : 4.8 V
-             Varef           : 0.0 V
-             Oscillator      : 1000.000 kHz
-             SCK period      : 1.1 us
+             Using port            : /dev/ttyUSB0
+             Using programmer      : nanoSTK
+             AVR Part              : ATtiny85
+             Programming modes     : ISP, HVSP, debugWIRE, SPM
+             Programmer Type       : STK500
+             Description           : nanoSTK - arduino nano programmer using stk500v1 protocol
+             HW Version            : 2
+             FW Version            : 1.50
+             Vtarget               : 4.8 V
+             Oscillator            : 8.000000 MHz
+             SCK period            : 1.0 us
+             XTAL frequency        : 16.000000 MHz
 avrdude-git: AVR device initialized and ready to accept instructions
 avrdude-git: device signature = 0x1e930b (probably t85)
 
@@ -182,14 +180,15 @@ t85    | 8K / 512     |      1.91 s |       1.54 s |       0.90 s |        0.89 
 
 ### Programming Slow Targets
 
-When programming targets with a clock speed lower than 6 MHz the SPI can be slowed down from 1 MHz to 250 kHz,
-this allows to communicate with targets using the default setup (internal 8 MHz oscillator divided by 8).
-To slow down connect pin D2 with GND and press the reset button. You can also use the terminal command `sck 4`.
+When programming targets with a clock speed lower than 4 MHz the SPI can be slowed down from 1 MHz to 125 kHz,
+this allows to communicate with slow targets (clock >= 500 kHz), e.g. using the default setup (internal 8 MHz oscillator divided by 8).
+To slow down connect pin D2 with GND and press the reset button. You can also use the terminal command `sck 8`.
 
 ### Providing External Clock
 
-To program a target without own clock generation, e.g. a processor on an adapter board, an external 1 MHz clock (5 V) is provided on pin D3.
-The clock frequncy can be changed with the terminal command `fosc`, e.g. `fosc 100k` sets 100 kHz.
+To program a target without own clock generation, e.g. a processor on an adapter board, an external 8 MHz clock (5 V) is provided on pin D3.
+This frequency is lowered to 1 MHz when pin D2 is connected to GND during reset.
+The clock frequency can be changed with the terminal command `fosc`, e.g. `fosc 100k` sets 100 kHz.
 
 ## Programming Protocol
 
@@ -199,8 +198,8 @@ The nanoSTK firmware uses the STK500 protocol, version 1 (`stk500v1`) as default
 even if describing it as *"Arduino for bootloader using STK500 v1 protocol"*:
 
 - **EEPROM access is handled differently:**
-  - Original `stk500v1` uses byte addresses (e.g 0..1023 for a device with 1K EEPROM).
-  - Modified `arduino` uses word addresses also for the EEPROM (0..511 for a 1K device).
+- Original `stk500v1` uses byte addresses (e.g 0..1023 for a device with 1K EEPROM).
+- Modified `arduino` uses word addresses also for the EEPROM (0..511 for a 1K device).
 - The `arduino` protocol does not support Vtarget and Varef.
 - The `stk500v1` protocol uses three `Cmnd_STK_UNIVERSAL` (0x56 = 'V') calls to get the signature.
 - The `arduino` protocol retrives the signature with the command `Cmnd_STK_READ_SIGN` (0x75 = 'u').
@@ -208,9 +207,8 @@ even if describing it as *"Arduino for bootloader using STK500 v1 protocol"*:
 The firmware automatically recognises the modified `arduino` protocol by its use of the command
 `Cmnd_STK_READ_SIGN` and adjusts the EEPROM addressing accordingly.
 
-    avrdude -p t85 -c arduino -v
-
 ```
+$ avrdude -p t85 -c arduino -v
          ...
          Programmer Type : Arduino
          Description     : Arduino for bootloader using STK500 v1 protocol
@@ -222,3 +220,23 @@ avrdude: device signature = 0x1e930b (probably t85)
 
 avrdude done.  Thank you.
 ```
+
+## Comparison With Original STK500
+
+If you work professionally with classic AVR processors, you can hardly avoid the
+[STK500](https://www.microchip.com/en-us/development-tool/atstk500);
+I also use it for development. However, two things speak against using it for programming
+ready targets via ISP: it requires an external power supply and needs space on the table.
+This is where my nanoSTK comes into play, small, robust thanks to the use of the nano-ISP
+connector, transportable and stand-alone, even when travelling.
+In addition, my nanoSTK programs much faster than my STK500.
+
+I took the Arduino *Sketch* *Arduino as ISP* as a basis and optimised it for robustness
+and speed. Furthermore, I added the handling of LEDs for status indication and generate
+a clock signal for programming AVR processors that require an external clock, e.g. a
+*naked* processor on a simple adapter board. The status LEDs are on the same port pins
+as on the [ScratchMonkey](https://github.com/microtherion/ScratchMonkey), as I initially
+used this firmware on my hardware. Sadly, this project is no longer being actively developed
+and is much more complex to modify due to its greater flexibility (more Arduino boards as
+platform, hi-voltage programming etc.).
+I don't need these functions, I use my good old STK500 for that.
