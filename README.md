@@ -177,9 +177,9 @@ t85    | 8K / 512     |      1.91 s |       1.54 s |       0.90 s |        0.89 
 
 ### Programming Slow Targets
 
-When programming targets with a clock speed lower than 6 MHz the SPI can be slowed down from 1 MHz to 250 kHz,
+When programming targets with a clock speed lower than 4 MHz the SPI can be slowed down from 1 MHz to 125 kHz,
 this allows to communicate with targets using the default setup (internal 8 MHz oscillator divided by 8).
-To slow down connect pin D2 with GND and press the reset button. You can also use the terminal command `sck 4`.
+To slow down connect pin D2 with GND and press the reset button. You can also use the terminal command `sck 8`.
 
 ### Providing External Clock
 

@@ -16,47 +16,47 @@ with most significant bit (MSB) first.
 */
 
 // check 3 signature bytes
-#define SIG_SIZE                3
+#define SIG_SIZE 3
 
-#define ISP_ENTER_PMODE_BYTE_0   0xAC
-#define ISP_ENTER_PMODE_BYTE_1   0x53
+#define ISP_ENTER_PMODE_BYTE_0 0xAC
+#define ISP_ENTER_PMODE_BYTE_1 0x53
 
-#define ISP_READ_PROG           0x20
+#define ISP_READ_PROG 0x20
 // "0010.0000--00aa.aaaa--aaaa.aaaa--oooo.oooo"; (all examples are for m328)
 
-#define ISP_READ_PROG_LOW       0x20
+#define ISP_READ_PROG_LOW 0x20
 // "0010.0000--00aa.aaaa--aaaa.aaaa--oooo.oooo";
 
-#define ISP_READ_PROG_HIGH      0x28
+#define ISP_READ_PROG_HIGH 0x28
 // "0010.1000--00aa.aaaa--aaaa.aaaa--oooo.oooo";
 
 
-#define ISP_READ_SIG            0x30
+#define ISP_READ_SIG 0x30
 // "0011.0000--000x.xxxx--xxxx.xxaa--oooo.oooo";
 
 
-#define ISP_LOAD_PROG_PAGE      0x40
+#define ISP_LOAD_PROG_PAGE 0x40
 // "0100.0000--000x.xxxx--xxaa.aaaa--iiii.iiii";
 
-#define ISP_LOAD_PROG_PAGE_LOW  0x40
+#define ISP_LOAD_PROG_PAGE_LOW 0x40
 // "0100.0000--000x.xxxx--xxaa.aaaa--iiii.iiii";
 
 #define ISP_LOAD_PROG_PAGE_HIGH 0x48
 // "0100.1000--000x.xxxx--xxaa.aaaa--iiii.iiii";
 
 
-#define ISP_WRITE_PROG_PAGE     0x4C
+#define ISP_WRITE_PROG_PAGE 0x4C
 // "0100.1100--00aa.aaaa--aaxx.xxxx--xxxx.xxxx";
 
 
-#define ISP_READ_EEPROM         0xA0
+#define ISP_READ_EEPROM 0xA0
 // "1010.0000--000x.xxaa--aaaa.aaaa--oooo.oooo";
 
-#define ISP_WRITE_EEPROM        0xC0
+#define ISP_WRITE_EEPROM 0xC0
 // "1100.0000--000x.xxaa--aaaa.aaaa--iiii.iiii";
 
-#define ISP_LOAD_EEPROM_PAGE    0xC1
+#define ISP_LOAD_EEPROM_PAGE 0xC1
 // "1100.0001--0000.0000--0000.00aa--iiii.iiii";
 
-#define ISP_WRITE_EEPROM_PAGE   0xC2
+#define ISP_WRITE_EEPROM_PAGE 0xC2
 // "1100.0010--00xx.xxaa--aaaa.aa00--xxxx.xxxx";

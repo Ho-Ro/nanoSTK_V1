@@ -26,9 +26,9 @@
 // HW version 2
 #define HWVER 2
 
-// SW version 1.30
+// SW version 1.32
 #define SWMAJ 1
-#define SWMIN 30
+#define SWMIN 32
 
 
 // This software turns the Arduino Nano into an AVR ISP using the following Arduino pins:
@@ -140,8 +140,8 @@ void setup() {
 #ifdef EXT_CLK
         initTimer2( 1, 0 ); // pscale = 1, cmatch = 0 -> 8 MHz
 #endif
-    } else {                                 // pin closed, slow down
-        SPI.init( 16 );                      // 16 * 0.5 µs = 8µs -> 125 kHz (target clock >= 500 kHz)
+    } else {            // pin closed, slow down
+        SPI.init( 16 ); // 16 * 0.5 µs = 8µs -> 125 kHz (target clock >= 500 kHz)
 #ifdef EXT_CLK
         initTimer2( 1, 7 ); // pscale = 1, cmatch = 7 -> 1 MHz
 #endif
@@ -158,7 +158,6 @@ void setup() {
 #ifdef HEARTBEAT
     pinMode( LED_HB, OUTPUT );
 #endif
-
 }
 
 
@@ -963,10 +962,10 @@ static void initTimer2( uint8_t pscale, uint8_t cmatch ) {
     pinMode( EXT_CLK_OUT, OUTPUT );
 
     // Initialize Timer2
-    TCCR2A = ( 1 << WGM21 ) | ( 1 << COM2B0 );          // CTC (MODE_2) + Toggle OC2B
-    TCCR2B = pscale;                                    // default: prescaler = 1
-    OCR2A = cmatch;                                     // default: 0 -> 8 MHz
-    TCNT2 = 0;                                          // Reset Timer2 Counter
+    TCCR2A = ( 1 << WGM21 ) | ( 1 << COM2B0 ); // CTC (MODE_2) + Toggle OC2B
+    TCCR2B = pscale;                           // default: prescaler = 1
+    OCR2A = cmatch;                            // default: 0 -> 8 MHz
+    TCNT2 = 0;                                 // Reset Timer2 Counter
 }
 
 #endif

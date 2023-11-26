@@ -47,9 +47,10 @@ void SPIclass::exit( void ) {
 // e.g. input = 6 (=3µs), next possible value is 4µs, return 8 (=4µs)
 
 uint8_t SPIclass::set_sck_duration( uint8_t sck_period ) {
-    if ( !sck_period ) // 0: do not change sck_duration
-        return sck_duration;
-    sck_duration = sck_period;
+    if ( !sck_period )
+        sck_period = sck_duration; // setup with current sck_duration
+    else
+        sck_duration = sck_period; // set new sck_duration value
     if ( sck_period > 16 ) {       // use bit banging
         SPCR = 0;                  // disable HW SPI
     } else if ( sck_period > 8 ) { // 16 MHz / 128 = 125 kHz -> 8 µs
