@@ -5,19 +5,16 @@
 
 
 #include <avr/io.h>
-#include <util/delay.h>
 
 #include "delay.h"
-#include "io.h"
 #include "spi.h"
-
 
 void SPIclass::init( uint8_t sck_period ) {
     // prepare SPI depending on speed
     set_sck_duration( sck_period );
     // Set MOSI and SCK output
-    DDR_MOSI |= ( 1 << BIT_MOSI );
-    DDR_SCK |= ( 1 << BIT_SCK );
+    DDRB |= ( 1 << PB3 );
+    DDRB |= ( 1 << PB5 );
 }
 
 
@@ -26,8 +23,8 @@ void SPIclass::exit( void ) {
     SPCR = 0;
     SPSR = 0;
     // Set MOSI and SCK input
-    DDR_MOSI &= ~( 1 << BIT_MOSI );
-    DDR_SCK &= ~( 1 << BIT_SCK );
+    DDRB &= ~( 1 << PB3 );
+    DDRB &= ~( 1 << PB5 );
 }
 
 
@@ -94,16 +91,16 @@ uint8_t SPIclass::transfer( uint8_t data ) {
         uint8_t response = 0;
         for ( int iii = 0; iii < 8; ++iii ) {
             response <<= 1;
-            if ( PIN_MISO & ( 1 << BIT_MISO ) ) // digitalRead( MISO_IN_PIN )
+            if ( PINB & ( 1 << PB4 ) ) // digitalRead( MISO_IN_PIN )
                 response |= 1;
             if ( data & 0x80 )
-                PORT_MOSI |= ( 1 << BIT_MOSI ); // digitalWrite( MOSI_OUT_PIN, HIGH );
+                PORTB |= ( 1 << PB3 ); // digitalWrite( MOSI_OUT_PIN, HIGH );
             else
-                PORT_MOSI &= ~( 1 << BIT_MOSI ); // digitalWrite( MOSI_OUT_PIN, LOW );
+                PORTB &= ~( 1 << PB3 ); // digitalWrite( MOSI_OUT_PIN, LOW );
             delay_us( sck_duration / 2 );
-            PORT_SCK |= ( 1 << BIT_SCK ); // digitalWrite( SCK_OUT_PIN, HIGH );
+            PORTB |= ( 1 << PB5 ); // digitalWrite( SCK_OUT_PIN, HIGH );
             delay_us( sck_duration / 2 );
-            PORT_SCK &= ~( 1 << BIT_SCK ); // digitalWrite( SCK_OUT_PIN, LOW );
+            PORTB &= ~( 1 << PB5 ); // digitalWrite( SCK_OUT_PIN, LOW );
             data <<= 1;
         }
         return response;

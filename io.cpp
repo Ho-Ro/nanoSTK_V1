@@ -1,9 +1,6 @@
-#include <avr/interrupt.h>
 #include <avr/io.h>
-#include <util/atomic.h>
 #include <util/delay.h>
 
-// #include "millis.h"
 
 void pinModeInput( uint8_t pin ) {
     if ( pin < 8 ) {
@@ -27,9 +24,9 @@ void pinModeInputPullup( uint8_t pin ) {
 
 void pinModeOutput( uint8_t pin ) {
     if ( pin < 8 ) {
-        DDRD |= ( 1 << pin ); // pinMode( pin, INPUT );
+        DDRD |= ( 1 << pin ); // pinMode( pin, OUTPUT );
     } else {
-        DDRB |= ( 1 << ( pin - 8 ) ); // pinMode( pin, INPUT );
+        DDRB |= ( 1 << ( pin - 8 ) ); // pinMode( pin, OUTPUT );
     }
 }
 
@@ -87,20 +84,23 @@ uint16_t read_adc( uint8_t channel ) {
     return ADCW; // Returns the ADC value of the chosen channel
 }
 
+// set PWM frequency to 1 kHz (divide F_CPU / 16000)
+static const uint16_t pwm_scale = 16000;
 
 void pwm_init( void ) {
     // Fast PWM 1 kHz
     // Clear OC1A on Compare Match / Set OC1A at Bottom; Wave Form Generator: Fast PWM 14, Top = ICR1
     TCCR1A = ( 1 << COM1A1 ) + ( 1 << WGM11 );
     TCCR1B = ( 1 << WGM13 ) + ( 1 << WGM12 ) + ( 1 << CS10 ); // prescaler = none;
-    ICR1 = 16000;
+    ICR1 = pwm_scale - 1;
     OCR1A = 0;
     DDRB |= ( 1 << PB1 );
 }
 
 
 void pwm_out( uint8_t percent ) {
-    if ( percent > 100 )
-        percent = 100;
-    OCR1A = percent * 160;
+    uint16_t ocr1a = percent * (pwm_scale / 100);
+    if ( ocr1a > pwm_scale - 1 )
+        ocr1a = pwm_scale - 1;
+    OCR1A = ocr1a;
 }

@@ -49,7 +49,7 @@ D5 .. D8 are identical to the [ScratchMonkey](https://github.com/microtherion/Sc
 
 The source code was originally created and tested with the *Arduino* toolchain
 version 1.8.19 under Linux, *Debian stable*.
-As of version 1.50, the build process is no longer dependent on the *Arduino* toolchain.
+Starting with version 1.50, the build process is no longer dependent on the *Arduino* toolchain.
 You only need the *avr-gcc* toolchain.
 
 The `Makefile` takes care of changes to the source code files and rebuilds the file
@@ -152,7 +152,7 @@ avrdude-git: Version 7.2-20231122 (606658a1)
              Programmer Type       : STK500
              Description           : nanoSTK - arduino nano programmer using stk500v1 protocol
              HW Version            : 2
-             FW Version            : 1.50
+             FW Version            : 1.51
              Vtarget               : 4.8 V
              Oscillator            : 8.000000 MHz
              SCK period            : 1.0 us

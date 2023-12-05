@@ -8,9 +8,8 @@ Using content from http://www.adnbr.co.uk/articles/counting-milliseconds
 Author: Monoclecat, https://github.com/monoclecat/avr-millis-function
 
 REMEMBER: Add sei(); after init_millis() to enable global interrupts!
- */
+*/
 
-#include "delay.h"
 #include <util/atomic.h>
 
 

@@ -16,9 +16,9 @@
 // HW version 2
 #define HWVER 2
 
-// SW version 1.50
+// SW version 1.51
 #define SWMAJ 1
-#define SWMIN 50
+#define SWMIN 51
 
 
 #include <stdint.h>
@@ -173,12 +173,12 @@ void setup() {
     // start with fast SPI as default, can be changed later with term command "sck"
     pinModeInputPullup( SPI_SPEED_SELECT );
     if ( digitalRead( SPI_SPEED_SELECT ) ) { // pin open, default = 2 * 0.5 µs clock period
-        SPI.init( 2 );                       // 1 MHz SPI speed, ok for target clock >=4 MHz
+        SPI.set_sck_duration( 2 );           // 1 MHz SPI speed, ok for target clock >=4 MHz
 #ifdef EXT_CLK
         initTimer2( 1, 0 ); // pscale = 1, cmatch = 0 -> 8 MHz
 #endif
-    } else {            // pin closed, slow down
-        SPI.init( 16 ); // 16 * 0.5 µs = 8µs -> 125 kHz (target clock >= 500 kHz)
+    } else {                        // pin closed, slow down
+        SPI.set_sck_duration( 16 ); // 16 * 0.5 µs = 8µs -> 125 kHz (target clock >= 500 kHz)
 #ifdef EXT_CLK
         initTimer2( 1, 7 ); // pscale = 1, cmatch = 7 -> 1 MHz
 #endif
@@ -452,6 +452,7 @@ static void stk_set_parameter( uint8_t parm ) {
 #ifdef EXT_CLK
     case Parm_STK_OSC_PSCALE:       // 0x86
         TCCR2B = get_byte() & 0x07; // prescaler
+        TCNT2 = 0;                  // Reset Timer2 Counter
         empty_reply();
         break;
     case Parm_STK_OSC_CMATCH: // 0x87
@@ -573,13 +574,13 @@ static void stk_enter_progmode() {
     // So we have to configure RESET_ISP as output here,
     // (reset_target() first sets the correct level)
     reset_target( true );
-    DDRB |= 1 << 2; // pinMode( RESET_ISP, OUTPUT );
-    SPI.init();     // HW init, do not change sck_duration
+    pinModeOutput( RESET_ISP );
+    SPI.init(); // HW init, do not change sck_duration
 
     // See AVR datasheets, chapter "SERIAL_PRG Programming Algorithm":
     // Pulse RESET_ISP after SCK_OUT_PIN is low:
     digitalWrite( SCK_OUT_PIN, 0 );
-    _delay_ms( 20 ); // discharge SCK_OUT_PIN, value arbitrarily chosen
+    delay_us( 100 ); // discharge SCK_OUT_PIN, value arbitrarily chosen
     reset_target( false );
     // Pulse must be minimum 2 target CPU clock cycles so 100 usec is ok for CPU
     // speeds above 20 KHz
@@ -587,7 +588,7 @@ static void stk_enter_progmode() {
     reset_target( true );
 
     // Send the enable programming command: 0xAC, 0x53, 0x00, 0x00
-    _delay_ms( 50 ); // datasheet: must be > 20 msec
+    _delay_ms( 25 ); // datasheet: must be > 20 msec
     spi_transaction( ISP_ENTER_PMODE_BYTE_0, ISP_ENTER_PMODE_BYTE_1, 0, 0 );
     digitalWrite( LED_PMODE, 1 );
     pmode = true;
@@ -599,7 +600,7 @@ static void stk_leave_progmode() {
     // We're about to take the target out of reset so configure SPI pins as input
     SPI.exit();
     reset_target( false );
-    DDRB |= 1 << 2; // pinMode( RESET_ISP, INPUT );
+    pinModeInput( RESET_ISP );
     digitalWrite( LED_PMODE, 0 );
     pmode = false;
     use_arduino_protocol = false; // switch back to default stk500v1 protocol
@@ -962,7 +963,7 @@ static uint8_t get_V_target_10() {
 #ifdef EXT_CLK
 
 //--------------------------------------------------------------------------------
-// configTimer2
+// initTimer2
 // output rectangle at D3 as clock signal for devices with external clock
 //--------------------------------------------------------------------------------
 static void initTimer2( uint8_t pscale, uint8_t cmatch ) {

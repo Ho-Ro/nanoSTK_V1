@@ -6,18 +6,6 @@
 
 #pragma once
 
-// defines for low level SPI bit bang
-#define DDR_MOSI DDRB
-#define PORT_MOSI PORTB
-#define BIT_MOSI PORTB3
-#define DDR_MISO DDRB
-#define PIN_MISO PINB
-#define BIT_MISO PINB4
-#define DDR_SCK DDRB
-#define PORT_SCK PORTB
-#define BIT_SCK PORTB5
-
-
 class SPIclass {
   public:
     void init( uint8_t sck_period = 0 );
