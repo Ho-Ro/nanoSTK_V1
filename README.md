@@ -1,5 +1,7 @@
 # nanoSTK_V1
 
+![nanoSTK](nanoSTK.jpg)
+
 ## Using Arduino Nano as AVR ISP with STK500 v1 protocol
 
 This project enables the use of an Arduino Nano board with minor modifications (nanoSTK)
@@ -230,6 +232,8 @@ ready targets via ISP: it requires an external power supply and needs space on t
 This is where my nanoSTK comes into play, small, robust thanks to the use of the nano-ISP
 connector, transportable and stand-alone, even when travelling.
 In addition, my nanoSTK programs much faster than my STK500.
+
+![nanoSTK With Target](nanoSTK_With_Target.jpg)
 
 I took the Arduino *Sketch* *Arduino as ISP* as a basis and optimised it for robustness
 and speed. Furthermore, I added the handling of LEDs for status indication and generate
