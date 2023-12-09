@@ -33,19 +33,40 @@ On all Arduinos, these pins are found on the ICSP/SPI header:
   This capacitor must be removed to reprogram the nanoSTK.
   It is therefore recommended to make the capacitor pluggable.
 
+```
+/RESET ---o<---|(--->o--- GND
+              +  -
+```
+
 With this setup the modified nanoSTK provides the supply voltage of 5 V to the target.
 
-#### Optional Modifications
+#### Optional Modifications (Status LEDs)
 
-Put LEDs (with resistor) on the following pins:
+Connect LEDs (with resistor to GND) to the following active high pins:
 
-- D9: Heartbeat - Indicates that the programmer is running
-- D8: Error     - An Error has occured - clear with programmer reset
-- D7: Write     - Writing to the target
-- D6: Read      - Reading from the target
-- D5: PMode     - Target in programming mode
+```
+Heartbeat - Indicates that the programmer is running
+D9 (PB1) ----|>|----/\/\---- GND
+             LED1    R1
 
-D5 .. D8 are identical to the [ScratchMonkey](https://github.com/microtherion/ScratchMonkey) status LEDs.
+Error     - An Error has occured - clear with programmer reset
+D8 (PB0) ----|>|----/\/\---- GND
+             LED2    R2
+
+Write     - Writing to the target
+D7 (PD7) ----|>|----/\/\---- GND
+             LED3    R3
+
+Read      - Reading from the target
+D6 (PD6) ----|>|----/\/\---- GND
+             LED4    R4
+
+PMode     - Target in programming mode
+D5 (PD5) ----|>|----/\/\---- GND
+             LED5    R5
+```
+
+D5 .. D8 are identical to the [ScratchMonkey](https://github.com/microtherion/ScratchMonkey) status LED pins.
 
 ## Firmware Development and Installation
 
