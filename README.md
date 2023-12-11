@@ -5,7 +5,7 @@
 ## Using Arduino Nano as AVR ISP with STK500 v1 protocol
 
 This project enables the use of an Arduino Nano board with minor modifications (nanoSTK)
-as the fastest in-system programmer (ISP) for classic AVR devices such as ATtiny and ATmega
+as the [fastest](README.md#programming-speed) DIY in-system programmer (ISP) for classic AVR devices such as ATtiny and ATmega
 together with a programming software, e.g. [AVRDUDE](https://github.com/avrdudes/avrdude/).
 
 The program is based on:
@@ -28,8 +28,8 @@ On all Arduinos, these pins are found on the ICSP/SPI header:
 
 #### Required HW Changes
 
-- Cut ISP header /RESET connection and connect this pin to D10.
-- Connect a capacitor of about 3..10 μF between the /RESET line (+) of the nano and GND (-).
+- Cut ISP header /RESET connection and connect this pin to D10 (PB2).
+- Connect a capacitor of about 3..10 μF between the /RESET line (+) of the Nano and GND (-).
   This capacitor must be removed to reprogram the nanoSTK.
   It is therefore recommended to make the capacitor pluggable.
 
@@ -112,6 +112,7 @@ and will not receive any new features, only critical bugs will be fixed.
 ## Usage
 
 The communication uses the `stk500v1` protocol over serial USB with a data rate of 115200 bps, this is the default speed of `avrdude`.
+As serial communication is the bottleneck, you can speed up programming or reading considerably with a higher `BAUDRATE` setting in the FW.
 
 ### Config File .avrduderc
 
@@ -127,12 +128,15 @@ Put this file into your home directory (Linux) to set the nanoSTK device as the 
 # this is the same as `-c stk500v1`
 # but has different features
 # warning: "extra_features" is not supported for avrdude version < 7.2
+# adjust the baudrate (default = 115200) if you have changed the `BAUDRATE` value in the FW
+# available values are 500000 bps or 1000000 bps
 
 programmer # nanoSTK
     id                     = "nanoSTK";
     desc                   = "nanoSTK - arduino nano programmer using stk500v1 protocol";
     type                   = "stk500";
     prog_modes             = PM_ISP;
+#    baudrate               = 500000;
 #    extra_features         = HAS_VTARG_READ | HAS_FOSC_ADJ;
     connection_type        = serial;
 ;
@@ -198,8 +202,26 @@ These times were measured on an ATmega328p and an ATtiny85 with random data afte
 
 Device | Flash/EEPROM | Flash write | Flash verify | EEPROM write | EEPROM verify
 -------|--------------|-------------|--------------|--------------|---------------
-m328p  | 32K / 1024   |      5.80 s |       4.36 s |       1.79 s |        1.79 s
+m328p  | 32K / 1024   |      5.63 s |       4.36 s |       1.79 s |        1.77 s
 t85    | 8K / 512     |      1.91 s |       1.54 s |       0.90 s |        0.89 s
+
+#### Comparison With Other Programmer FW
+
+Comparison between the original STK500 and three FW variants for the modified Arduino Nano board, see also the [detailed documentation](timing_benchmark.md):
+
+- Target: ATmega328p 8MHz internal clock - flash memory
+- Data: 32K random data
+
+Programmer      | Flash write | Flash verify
+----------------|-------------|-------------
+STK500          | 12.28 s     | 11.31 s
+arduino as ISP  | 36.61 s     | 20.21 s
+ScratchMonkey   |  8.18 s     |  7.97 s
+nanoSTK         |  6.15 s     |  4.36 s
+nanoSTK 500kbps |  3.84 s     |  3.33 s
+
+The serial USB communication becomes the clear bottleneck, you can speed up further with higher `BAUDRATE` setting in the FW,
+e.g. a speed of 500 kbps significantly reduces the programming time.
 
 ### Programming Slow Targets
 

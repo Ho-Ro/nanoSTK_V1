@@ -66,11 +66,11 @@ const uint8_t RESET_ISP = 10; // /SS (PB2)
 
 // Configure the baud rate
 // 115200 is the avrdude default value
-#define BITRATE 115200UL
+#define BAUDRATE 115200UL
 // BAUDRATE 230400 does not work!
 // Use one of the next two for faster speed:
-// #define BITRATE 500000UL
-// #define BITRATE 1000000UL
+// #define BAUDRATE 500000UL
+// #define BAUDRATE 1000000UL
 
 // Configure which pins to use:
 
@@ -168,7 +168,7 @@ int main( void ) {
 
 void setup() {
     init_millis();         // init the timekeeping
-    UART.begin( BITRATE ); // init serial communication - enables interrrupts with sei()
+    UART.begin( BAUDRATE ); // init serial communication - enables interrrupts with sei()
 
     // start with fast SPI as default, can be changed later with term command "sck"
     pinModeInputPullup( SPI_SPEED_SELECT );
