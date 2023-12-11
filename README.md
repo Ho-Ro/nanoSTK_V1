@@ -202,7 +202,7 @@ These times were measured on an ATmega328p and an ATtiny85 with random data afte
 
 Device | Flash/EEPROM | Flash write | Flash verify | EEPROM write | EEPROM verify
 -------|--------------|-------------|--------------|--------------|---------------
-m328p  | 32K / 1024   |      5.63 s |       4.36 s |       1.79 s |        1.77 s
+m328p  | 32K / 1024   |      6.15 s |       4.36 s |       1.79 s |        1.77 s
 t85    | 8K / 512     |      1.91 s |       1.54 s |       0.90 s |        0.89 s
 
 #### Comparison With Other Programmer FW
