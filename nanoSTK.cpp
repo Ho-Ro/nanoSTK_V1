@@ -64,6 +64,7 @@
 
 const uint8_t RESET_ISP = 10; // /SS (PB2)
 
+#ifndef BAUDRATE
 // Configure the baud rate
 // 115200 is the avrdude default value
 #define BAUDRATE 115200UL
@@ -71,6 +72,7 @@ const uint8_t RESET_ISP = 10; // /SS (PB2)
 // Use one of the next two for faster speed:
 // #define BAUDRATE 500000UL
 // #define BAUDRATE 1000000UL
+#endif
 
 // Configure which pins to use:
 

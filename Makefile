@@ -13,6 +13,11 @@ F_CPU = 16000000
 
 DEVICE = atmega328p
 
+# if not defined use default baudrate of 115200 bps
+ifdef BAUDRATE
+	DEFINE_BAUDRATE = -D BAUDRATE=$(BAUDRATE)
+endif
+
 AVRDUDE = avrdude
 
 COMPILE = avr-gcc -std=c++11 -g -Wall -Wextra -Os -I. -mmcu=$(DEVICE) -DF_CPU=$(F_CPU)
@@ -52,8 +57,8 @@ clean:
 # file targets #
 ################
 
-$(PROJECT).o:	$(PROJECT).cpp $(DEPENDS)
-	$(COMPILE) -c $< -o $@
+$(PROJECT).o: $(PROJECT).cpp $(DEPENDS)
+	$(COMPILE) $(DEFINE_BAUDRATE) -c $< -o $@
 
 delay.o:delay.cpp $(DEPENDS)
 	$(COMPILE) -c $< -o $@
