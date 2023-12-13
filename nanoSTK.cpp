@@ -16,9 +16,9 @@
 // HW version 2
 #define HWVER 2
 
-// SW version 1.51
+// SW version 1.52
 #define SWMAJ 1
-#define SWMIN 51
+#define SWMIN 52
 
 
 #include <stdint.h>
@@ -221,10 +221,11 @@ static uint8_t sig[ SIG_SIZE ];
 
 // default wait delay before writing next EEPROM location
 // can be adapted according to device signature
-#define WAIT_DELAY_EEPROM_FAST 4
-#define WAIT_DELAY_EEPROM_DEFAULT 10
+static const int16_t wait_delay_FLASH = 5;
+static const int16_t wait_delay_EEPROM_FAST = 4;
+static const int16_t wait_delay_EEPROM_DEFAULT = 10;
 
-static int16_t wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;
+static int16_t wait_delay_EEPROM = wait_delay_EEPROM_DEFAULT;
 
 
 static uint16_t buff_get_16( uint16_t addr ) { return buff[ addr ] * 0x100 + buff[ addr + 1 ]; }
@@ -560,7 +561,7 @@ static void stk_set_device_ext() {
 static void stk_enter_progmode() {
 
     // set EEPROM delay to the default value
-    wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;
+    wait_delay_EEPROM = wait_delay_EEPROM_DEFAULT;
 
     // set default stk500v1 protocol
     use_arduino_protocol = false;
@@ -753,6 +754,7 @@ static void load_flash_page( uint8_t hilo, uint16_t addr, uint8_t data ) {
 static void write_flash_page( uint16_t addr ) {
     spi_transaction( ISP_WRITE_PROG_PAGE, addr >> 8 & 0xFF, addr & 0xFF,
                      0 ); // 0x4C
+    start_isp_delay( wait_delay_FLASH );
 }
 
 
@@ -927,23 +929,23 @@ static void byte_reply( uint8_t b ) {
 
 static void hack_eeprom_delay() {
     // set short eeprom delay 4 ms for newer devices instead of 10 ms
-    wait_delay_EEPROM = WAIT_DELAY_EEPROM_DEFAULT;      // set default value
+    wait_delay_EEPROM = wait_delay_EEPROM_DEFAULT;      // set default value
     if ( 0x1e == sig[ 0 ] ) {                           // valid AVR parts
         if ( 0x95 == sig[ 1 ] ) {                       // 32K flash parts
             if ( 0x0f == sig[ 2 ] || 0x14 == sig[ 2 ] ) // m328p, m328
-                wait_delay_EEPROM = WAIT_DELAY_EEPROM_FAST;
+                wait_delay_EEPROM = wait_delay_EEPROM_FAST;
         } else if ( 0x94 == sig[ 1 ] ) {                // 16K flash parts
             if ( 0x06 == sig[ 2 ] || 0x0b == sig[ 2 ] ) // m168, m168p
-                wait_delay_EEPROM = WAIT_DELAY_EEPROM_FAST;
+                wait_delay_EEPROM = wait_delay_EEPROM_FAST;
         } else if ( 0x93 == sig[ 1 ] ) {                                    // 8K flash parts
             if ( 0x0a == sig[ 2 ] || 0x0b == sig[ 2 ] || 0x0f == sig[ 2 ] ) // m88, t85, m88p
-                wait_delay_EEPROM = WAIT_DELAY_EEPROM_FAST;
+                wait_delay_EEPROM = wait_delay_EEPROM_FAST;
         } else if ( 0x92 == sig[ 1 ] ) {                                    // 4K flash parts
             if ( 0x05 == sig[ 2 ] || 0x06 == sig[ 2 ] || 0x0a == sig[ 2 ] ) // m48, t45, m48p
-                wait_delay_EEPROM = WAIT_DELAY_EEPROM_FAST;
+                wait_delay_EEPROM = wait_delay_EEPROM_FAST;
         } else if ( 0x91 == sig[ 1 ] ) { // 2K flash parts
             if ( 0x08 == sig[ 2 ] )      // t25
-                wait_delay_EEPROM = WAIT_DELAY_EEPROM_FAST;
+                wait_delay_EEPROM = wait_delay_EEPROM_FAST;
         }
     }
 }

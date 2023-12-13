@@ -219,9 +219,10 @@ arduino as ISP  | 36.61 s     | 20.21 s
 ScratchMonkey   |  8.18 s     |  7.97 s
 nanoSTK         |  6.15 s     |  4.36 s
 nanoSTK 500kbps |  3.84 s     |  3.33 s
+nanoSTK 1Mbps   |  3.58 s     |  3.33 s
 
 The serial USB communication becomes the clear bottleneck, you can speed up further with higher `BAUDRATE` setting in the FW,
-e.g. a speed of 500 kbps significantly reduces the programming time.
+e.g. a speed of 500 kbps or 1 Mbps significantly reduces the programming time.
 
 ### Programming Slow Targets
 

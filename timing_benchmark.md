@@ -14,6 +14,7 @@ arduino as ISP  | 36.61 s     | 20.21 s
 ScratchMonkey   |  8.18 s     |  7.97 s
 nanoSTK         |  6.15 s     |  4.36 s
 nanoSTK 500kbps |  3.84 s     |  3.33 s
+nanoSTK 1Mbps   |  3.58 s     |  3.33 s
 
 ### Original Atmel STK500
 ```
